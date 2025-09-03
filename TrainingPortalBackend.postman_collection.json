@@ -1,0 +1,447 @@
+{
+  "info": {
+    "name": "Training Portal Backend",
+    "_postman_id": "b1e1e1e1-1111-2222-3333-444444444444",
+    "description": "Postman collection for Training Portal Backend authentication, public endpoints, company, module (with videos & MCQs), and user management APIs",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Trainee Signup",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"password\": \"Password123!\",\n  \"companyName\": \"Acme Corp\"\n}"
+            },
+            "url": { "raw": "http://localhost:5000/api/auth/signup", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "auth", "signup"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\",\n  \"password\": \"Password123!\"\n}"
+            },
+            "url": { "raw": "http://localhost:5000/api/auth/login", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "auth", "login"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Verify Email",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"<email_verification_token>\"\n}"
+            },
+            "url": { "raw": "http://localhost:5000/api/auth/verify-email", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "auth", "verify-email"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Admin Signup",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Admin User\",\n  \"email\": \"admin@example.com\",\n  \"password\": \"AdminPassword123!\"\n}"
+            },
+            "url": { "raw": "http://localhost:5000/api/auth/admin/signup", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "auth", "admin", "signup"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Admin Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"AdminPassword123!\"\n}"
+            },
+            "url": { "raw": "http://localhost:5000/api/auth/admin/login", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "auth", "admin", "login"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Public Endpoints",
+      "item": [
+        {
+          "name": "Get Public Companies",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "http://localhost:5000/api/companies", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "companies"] }
+          },
+          "response": [
+            {
+              "name": "Sample Response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": { "raw": "http://localhost:5000/api/companies", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "companies"] }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                { "key": "Content-Type", "value": "application/json" }
+              ],
+              "cookie": [],
+              "body": "[\n  {\n    \"id\": 1,\n    \"name\": \"Acme Corporation\",\n    \"logo\": null\n  },\n  {\n    \"id\": 2,\n    \"name\": \"Tech Solutions Inc.\",\n    \"logo\": null\n  },\n  {\n    \"id\": 3,\n    \"name\": \"Global Industries Ltd.\",\n    \"logo\": null\n  }\n]"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "User Management",
+      "item": [
+        {
+          "name": "Get All Users",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}", "description": "Admin token required" }
+            ],
+            "url": { "raw": "http://localhost:5000/api/admin/users", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "admin", "users"] }
+          },
+          "response": []
+        },
+        {
+          "name": "List Trainees",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}", "description": "Admin token required" }
+            ],
+            "url": { "raw": "http://localhost:5000/api/admin/trainees", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "admin", "trainees"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Trainee",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}", "description": "Admin token required" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jane Doe\",\n  \"email\": \"jane@example.com\",\n  \"password\": \"Password123!\",\n  \"companyId\": 1\n}"
+            },
+            "url": { "raw": "http://localhost:5000/api/admin/trainees", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "admin", "trainees"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Trainee",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}", "description": "Admin token required" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jane Doe Updated\",\n  \"email\": \"jane.updated@example.com\",\n  \"companyId\": 1\n}"
+            },
+            "url": { "raw": "http://localhost:5000/api/admin/trainees/1", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "admin", "trainees", "1"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Trainee",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}", "description": "Admin token required" }
+            ],
+            "url": { "raw": "http://localhost:5000/api/admin/trainees/1", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "admin", "trainees", "1"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Company Management",
+      "item": [
+        {
+          "name": "Create Company (with logo)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "multipart/form-data" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}", "description": "Admin token required" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "name", "value": "Acme Corp", "type": "text" },
+                { "key": "logo", "type": "file", "description": "Upload a company logo image (JPG, PNG, etc.)" }
+              ]
+            },
+            "url": { "raw": "http://localhost:5000/api/admin/companies", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "admin", "companies"] }
+          },
+          "response": []
+        },
+        {
+          "name": "List Companies",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}", "description": "Admin token required" }
+            ],
+            "url": { "raw": "http://localhost:5000/api/admin/companies", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "admin", "companies"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Company (with logo)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "multipart/form-data" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}", "description": "Admin token required" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "name", "value": "Acme Corp Updated", "type": "text" },
+                { "key": "logo", "type": "file", "description": "Upload a new company logo image (JPG, PNG, etc.)" }
+              ]
+            },
+            "url": { "raw": "http://localhost:5000/api/admin/companies/1", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "admin", "companies", "1"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Company",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}", "description": "Admin token required" }
+            ],
+            "url": { "raw": "http://localhost:5000/api/admin/companies/1", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "admin", "companies", "1"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Module Management (Complete)",
+      "item": [
+        {
+          "name": "Get All Modules (with Videos & MCQs)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}", "description": "Admin token required" }
+            ],
+            "url": { "raw": "http://localhost:5000/api/admin/modules", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "admin", "modules"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Add Module to Company",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}", "description": "Admin token required" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Module 1\"\n}"
+            },
+            "url": { "raw": "http://localhost:5000/api/admin/companies/1/modules", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "admin", "companies", "1", "modules"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Module",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}", "description": "Admin token required" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Module 1 Updated\"\n}"
+            },
+            "url": { "raw": "http://localhost:5000/api/admin/modules/1", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "admin", "modules", "1"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Module",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}", "description": "Admin token required" }
+            ],
+            "url": { "raw": "http://localhost:5000/api/admin/modules/1", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "admin", "modules", "1"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Add Video to Module",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "multipart/form-data" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}", "description": "Admin token required" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "video", "type": "file", "description": "Upload a video file (MP4, AVI, etc.)" },
+                { "key": "duration", "value": "600", "type": "text", "description": "Video duration in seconds" }
+              ]
+            },
+            "url": { "raw": "http://localhost:5000/api/admin/modules/1/video", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "admin", "modules", "1", "video"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Add MCQs to Module",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}", "description": "Admin token required" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mcqs\": [\n    {\n      \"question\": \"What is Node.js?\",\n      \"options\": [\"A runtime\", \"A database\", \"A browser\", \"A language\"],\n      \"answer\": \"A runtime\",\n      \"explanation\": \"Node.js is a JavaScript runtime.\"\n    }\n  ]\n}"
+            },
+            "url": { "raw": "http://localhost:5000/api/admin/modules/1/mcqs", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "admin", "modules", "1", "mcqs"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Trainee Progress",
+      "item": [
+        {
+          "name": "Get Trainee Progress",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}", "description": "Admin token required" }
+            ],
+            "url": { "raw": "http://localhost:5000/api/admin/trainees/1/progress", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "admin", "trainees", "1", "progress"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Trainee",
+      "item": [
+        {
+          "name": "Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}", "description": "Trainee token required" }
+            ],
+            "url": { "raw": "http://localhost:5000/api/trainee/dashboard", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "trainee", "dashboard"] }
+          },
+          "response": []
+        },
+        {
+          "name": "List Assigned Modules",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}", "description": "Trainee token required" }
+            ],
+            "url": { "raw": "http://localhost:5000/api/trainee/modules", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "trainee", "modules"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Module Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}", "description": "Trainee token required" }
+            ],
+            "url": { "raw": "http://localhost:5000/api/trainee/modules/1", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "trainee", "modules", "1"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Complete Module",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}", "description": "Trainee token required" }
+            ],
+            "url": { "raw": "http://localhost:5000/api/trainee/modules/1/complete", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "trainee", "modules", "1", "complete"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Submit MCQ Answers",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}", "description": "Trainee token required" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"answers\": [\n    {\n      \"questionId\": 1,\n      \"selectedOption\": \"A runtime\"\n    }\n  ]\n}"
+            },
+            "url": { "raw": "http://localhost:5000/api/trainee/modules/1/mcq", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "trainee", "modules", "1", "mcq"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Video Time (Granular Tracking)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}", "description": "Trainee token required" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"timeSpent\": 120\n}"
+            },
+            "url": { "raw": "http://localhost:5000/api/trainee/modules/1/time", "protocol": "http", "host": ["localhost"], "port": "5000", "path": ["api", "trainee", "modules", "1", "time"] }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+} 

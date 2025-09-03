@@ -1,0 +1,197 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                   Int                   @id @default(autoincrement())
+  name                 String
+  email                String                @unique
+  password             String
+  role                 Role
+  companyId            Int?
+  isVerified           Boolean               @default(false)
+  receivedMessages     ChatMessage[]         @relation("MessageReceiver")
+  sentMessages         ChatMessage[]         @relation("MessageSender")
+  chatRoomParticipants ChatRoomParticipant[] @relation("ChatRoomParticipants")
+  feedback             Feedback[]
+  helpRequests         HelpRequest[]
+  mcqAnswers           MCQAnswer[]
+  notifications        Notification[]
+  progress             TraineeProgress[]
+  company              Company?              @relation(fields: [companyId], references: [id])
+}
+
+model Company {
+  id        Int              @id @default(autoincrement())
+  name      String           @unique
+  logo      String?
+  chatRooms ChatRoom[]
+  modules   TrainingModule[]
+  users     User[]
+}
+
+model TrainingModule {
+  id           Int               @id @default(autoincrement())
+  name         String
+  companyId    Int
+  order        Int               @default(0)
+  feedback     Feedback[]
+  helpRequests HelpRequest[]
+  mcqs         MCQ[]
+  mcqAnswers   MCQAnswer[]
+  progress     TraineeProgress[]
+  company      Company           @relation(fields: [companyId], references: [id])
+  videos       Video[]
+}
+
+model Video {
+  id       Int            @id @default(autoincrement())
+  url      String
+  duration Int
+  moduleId Int
+  module   TrainingModule @relation(fields: [moduleId], references: [id])
+}
+
+model MCQ {
+  id          Int            @id @default(autoincrement())
+  question    String
+  options     String[]
+  answer      String
+  explanation String?
+  moduleId    Int
+  module      TrainingModule @relation(fields: [moduleId], references: [id])
+  mcqAnswers  MCQAnswer[]
+}
+
+model TraineeProgress {
+  id        Int            @id @default(autoincrement())
+  userId    Int
+  moduleId  Int
+  completed Boolean        @default(false)
+  score     Int?
+  timeSpent Int?
+  pass      Boolean        @default(false)
+  createdAt DateTime       @default(now())
+  status    String         @default("IN_PROGRESS")
+  updatedAt DateTime       @updatedAt
+  module    TrainingModule @relation(fields: [moduleId], references: [id])
+  user      User           @relation(fields: [userId], references: [id])
+}
+
+model MCQAnswer {
+  id             Int            @id @default(autoincrement())
+  userId         Int
+  moduleId       Int
+  mcqId          Int
+  selectedOption String
+  isCorrect      Boolean
+  createdAt      DateTime       @default(now())
+  mcq            MCQ            @relation(fields: [mcqId], references: [id])
+  module         TrainingModule @relation(fields: [moduleId], references: [id])
+  user           User           @relation(fields: [userId], references: [id])
+}
+
+model HelpRequest {
+  id         Int               @id @default(autoincrement())
+  traineeId  Int
+  moduleId   Int?
+  message    String?
+  status     HelpRequestStatus @default(PENDING)
+  adminNotes String?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  module     TrainingModule?   @relation(fields: [moduleId], references: [id])
+  trainee    User              @relation(fields: [traineeId], references: [id])
+}
+
+model Feedback {
+  id        Int            @id @default(autoincrement())
+  moduleId  Int
+  rating    Int
+  comment   String?
+  createdAt DateTime       @default(now())
+  userId    Int
+  module    TrainingModule @relation(fields: [moduleId], references: [id])
+  user      User           @relation(fields: [userId], references: [id])
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  type      String
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  metadata  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model ChatRoom {
+  id           Int                   @id @default(autoincrement())
+  name         String?
+  type         ChatRoomType          @default(DIRECT)
+  companyId    Int
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+  messages     ChatMessage[]
+  company      Company               @relation(fields: [companyId], references: [id])
+  participants ChatRoomParticipant[] @relation("ChatRoomParticipants")
+}
+
+model ChatRoomParticipant {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  chatRoomId Int
+  joinedAt   DateTime @default(now())
+  isActive   Boolean  @default(true)
+  chatRoom   ChatRoom @relation("ChatRoomParticipants", fields: [chatRoomId], references: [id])
+  user       User     @relation("ChatRoomParticipants", fields: [userId], references: [id])
+
+  @@unique([userId, chatRoomId])
+}
+
+model ChatMessage {
+  id          Int         @id @default(autoincrement())
+  content     String
+  senderId    Int
+  receiverId  Int?
+  chatRoomId  Int
+  messageType MessageType @default(TEXT)
+  isRead      Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  chatRoom    ChatRoom    @relation(fields: [chatRoomId], references: [id])
+  receiver    User?       @relation("MessageReceiver", fields: [receiverId], references: [id])
+  sender      User        @relation("MessageSender", fields: [senderId], references: [id])
+}
+
+enum Role {
+  ADMIN
+  TRAINEE
+}
+
+enum HelpRequestStatus {
+  PENDING
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum ChatRoomType {
+  DIRECT
+  GROUP
+}
+
+enum MessageType {
+  TEXT
+  FILE
+  IMAGE
+  SYSTEM
+}
