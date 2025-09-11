@@ -3,8 +3,18 @@ const prisma = require('../prismaClient');
 // Get or create a direct chat room between two users
 const getOrCreateDirectChat = async (req, res) => {
   try {
+    console.log('=== CHAT DIRECT DEBUG ===');
+    console.log('Request headers:', req.headers);
+    console.log('Request user:', req.user);
+    console.log('Participant ID:', req.params.participantId);
+    
     const { participantId } = req.params;
-    const currentUserId = req.user.id;
+    const currentUserId = req.user?.id;
+    
+    if (!currentUserId) {
+      console.log('No user ID found in request');
+      return res.status(401).json({ message: 'User not authenticated' });
+    }
 
     // Check if both users exist
     const currentUser = await prisma.user.findUnique({
@@ -69,8 +79,26 @@ const getOrCreateDirectChat = async (req, res) => {
     // If no chat room exists, create one
     if (!chatRoom) {
       // For cross-company chats, use the current user's company as primary
-      // or create a special cross-company identifier
-      const chatRoomCompanyId = currentUser.companyId || 1; // Fallback to company 1 if needed
+      // or find a valid company ID if current user has no company
+      let chatRoomCompanyId = currentUser.companyId;
+      
+      // If current user has no company, use the participant's company
+      if (!chatRoomCompanyId) {
+        chatRoomCompanyId = participant.companyId;
+      }
+      
+      // If neither user has a company, find the first available company
+      if (!chatRoomCompanyId) {
+        const firstCompany = await prisma.company.findFirst({
+          select: { id: true }
+        });
+        chatRoomCompanyId = firstCompany?.id;
+      }
+      
+      // If still no company found, we can't create a chat room
+      if (!chatRoomCompanyId) {
+        return res.status(400).json({ message: 'No valid company found for chat room creation' });
+      }
       
       chatRoom = await prisma.chatRoom.create({
         data: {

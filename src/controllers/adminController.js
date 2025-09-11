@@ -1,6 +1,9 @@
 const prisma = require('../prismaClient');
 const path = require('path');
+const fs = require('fs');
 const bcrypt = require('bcrypt');
+const NotificationService = require('../services/notificationService');
+const CertificateService = require('../services/certificateService');
 
 module.exports = {
   // Simple test endpoint
@@ -233,9 +236,10 @@ module.exports = {
   getCompanies: async (req, res) => {
     try {
       const companies = await prisma.company.findMany();
-      res.json(companies);
+      res.json({ success: true, companies });
     } catch (err) {
-      res.status(500).json({ message: 'Server error' });
+      console.error('Error in getCompanies:', err);
+      res.status(500).json({ success: false, message: 'Server error', error: err.message });
     }
   },
   createCompany: async (req, res) => {
@@ -508,11 +512,12 @@ module.exports = {
   addModule: async (req, res) => {
     try {
       const { id } = req.params; 
-      const { name } = req.body;
+      const { name, isResourceModule } = req.body;
       
       console.log('=== ADD MODULE DEBUG ===');
       console.log('Company ID:', id);
       console.log('Module name:', name);
+      console.log('Is Resource Module:', isResourceModule);
       console.log('Request body:', req.body);
       
       if (!name) {
@@ -544,6 +549,7 @@ module.exports = {
         data: {
           name,
           companyId: Number(id),
+          isResourceModule: Boolean(isResourceModule),
         },
       });
 
@@ -666,6 +672,12 @@ module.exports = {
       });
       console.log('Deleted feedback:', deletedFeedback.count);
 
+      // Delete resources
+      const deletedResources = await prisma.resource.deleteMany({
+        where: { moduleId },
+      });
+      console.log('Deleted resources:', deletedResources.count);
+
       // Finally delete the module
       console.log('Deleting module...');
       await prisma.trainingModule.delete({
@@ -737,7 +749,7 @@ module.exports = {
       console.log('Creating new video record...');
       const video = await prisma.video.create({
         data: {
-          url: req.file.filename,
+          url: `/uploads/${req.file.filename}`,
           duration: videoDuration,
           moduleId: Number(id),
         },
@@ -1075,6 +1087,16 @@ module.exports = {
               explanation: true,
             },
           },
+          resources: {
+            select: {
+              id: true,
+              filename: true,
+              originalName: true,
+              type: true,
+              url: true,
+              filePath: true,
+            },
+          },
         },
         orderBy: [
           { companyId: 'asc' },
@@ -1309,4 +1331,934 @@ module.exports = {
       return res.status(500).json({ success: false, message: 'Failed to update module orders', error: error.message });
     }
   },
+
+  // Resource management methods
+  addResource: async (req, res) => {
+    try {
+      console.log('=== ADD RESOURCE DEBUG ===');
+      console.log('Request file:', req.file);
+      console.log('Request body:', req.body);
+      console.log('Request headers:', req.headers);
+
+      if (!req.file) {
+        return res.status(400).json({ success: false, message: 'No file uploaded' });
+      }
+
+      const { moduleId, type, duration, estimatedReadingTime } = req.body;
+
+      if (!moduleId || !type) {
+        return res.status(400).json({ success: false, message: 'Module ID and type are required' });
+      }
+
+      // Create resource record
+      const resource = await prisma.resource.create({
+        data: {
+          url: `/uploads/resources/${req.file.filename}`,
+          filename: req.file.filename,
+          originalName: req.file.originalname,
+          type: type,
+          duration: duration ? parseInt(duration) : null,
+          estimatedReadingTime: estimatedReadingTime ? parseInt(estimatedReadingTime) : null,
+          filePath: req.file.filename,
+          moduleId: parseInt(moduleId)
+        }
+      });
+
+      console.log('Resource created successfully:', resource);
+
+      return res.json({ 
+        success: true, 
+        message: 'Resource uploaded successfully',
+        resource: resource
+      });
+    } catch (error) {
+      console.error('Error in addResource:', error);
+      return res.status(500).json({ success: false, message: 'Failed to upload resource', error: error.message });
+    }
+  },
+
+  getModuleResources: async (req, res) => {
+    try {
+      const { moduleId } = req.params;
+
+      const resources = await prisma.resource.findMany({
+        where: { moduleId: parseInt(moduleId) },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      // Transform resources to match frontend expectations
+      const transformedResources = resources.map(resource => ({
+        id: resource.id,
+        filename: resource.filename,
+        originalName: resource.originalName || resource.filename, // fallback to filename
+        filePath: resource.filePath || resource.url, // fallback to url
+        url: resource.url, // Include the url field
+        type: resource.type,
+        duration: resource.duration,
+        estimatedReadingTime: resource.estimatedReadingTime,
+        moduleId: resource.moduleId,
+        createdAt: resource.createdAt?.toISOString() || new Date().toISOString(),
+        updatedAt: resource.updatedAt?.toISOString() || new Date().toISOString()
+      }));
+
+      return res.json({ success: true, resources: transformedResources });
+    } catch (error) {
+      console.error('Error in getModuleResources:', error);
+      return res.status(500).json({ success: false, message: 'Failed to fetch resources', error: error.message });
+    }
+  },
+
+  deleteResource: async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      // Get resource to find file path
+      const resource = await prisma.resource.findUnique({
+        where: { id: parseInt(id) }
+      });
+
+      if (!resource) {
+        return res.status(404).json({ success: false, message: 'Resource not found' });
+      }
+
+      // Delete from database
+      await prisma.resource.delete({
+        where: { id: parseInt(id) }
+      });
+
+      // TODO: Delete physical file from uploads folder
+      // const fs = require('fs');
+      // const filePath = path.join(__dirname, '../uploads/resources', resource.filePath);
+      // if (fs.existsSync(filePath)) {
+      //   fs.unlinkSync(filePath);
+      // }
+
+      return res.json({ success: true, message: 'Resource deleted successfully' });
+    } catch (error) {
+      console.error('Error in deleteResource:', error);
+      return res.status(500).json({ success: false, message: 'Failed to delete resource', error: error.message });
+    }
+  },
+
+  // Manager management functions
+  getManagers: async (req, res) => {
+    try {
+      const managers = await prisma.user.findMany({
+        where: { role: 'MANAGER' },
+        include: {
+          managedCompanies: {
+            include: {
+              company: true
+            }
+          }
+        }
+      });
+
+      res.json({ success: true, managers });
+    } catch (error) {
+      console.error('Error in getManagers:', error);
+      res.status(500).json({ success: false, message: 'Failed to fetch managers', error: error.message });
+    }
+  },
+
+  createManager: async (req, res) => {
+    try {
+      console.log('=== CREATE MANAGER DEBUG ===');
+      console.log('Request body:', req.body);
+      
+      const { name, email, password } = req.body;
+
+      if (!name || !email || !password) {
+        console.log('Missing required fields:', { name: !!name, email: !!email, password: !!password });
+        return res.status(400).json({ success: false, message: 'Name, email, and password are required' });
+      }
+
+      console.log('Checking if user already exists...');
+      // Check if user already exists
+      const existingUser = await prisma.user.findUnique({
+        where: { email }
+      });
+
+      if (existingUser) {
+        console.log('User already exists:', existingUser.email);
+        return res.status(400).json({ success: false, message: 'User with this email already exists' });
+      }
+
+      console.log('Hashing password...');
+      // Hash password
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      console.log('Creating manager in database...');
+      // Create manager
+      const manager = await prisma.user.create({
+        data: {
+          name,
+          email,
+          password: hashedPassword,
+          role: 'MANAGER',
+          isVerified: true,
+          status: 'APPROVED'  // Managers created by admin are automatically approved
+        }
+      });
+
+      console.log('Manager created successfully:', manager);
+      res.json({ success: true, manager });
+    } catch (error) {
+      console.error('Error in createManager:', error);
+      res.status(500).json({ success: false, message: 'Failed to create manager', error: error.message });
+    }
+  },
+
+  updateManager: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, email, password } = req.body;
+
+      const updateData = { name, email };
+      
+      if (password) {
+        updateData.password = await bcrypt.hash(password, 10);
+      }
+
+      const manager = await prisma.user.update({
+        where: { id: parseInt(id) },
+        data: updateData,
+        include: {
+          managedCompanies: {
+            include: {
+              company: true
+            }
+          }
+        }
+      });
+
+      res.json({ success: true, manager });
+    } catch (error) {
+      console.error('Error in updateManager:', error);
+      res.status(500).json({ success: false, message: 'Failed to update manager', error: error.message });
+    }
+  },
+
+  deleteManager: async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      await prisma.user.delete({
+        where: { id: parseInt(id) }
+      });
+
+      res.json({ success: true, message: 'Manager deleted successfully' });
+    } catch (error) {
+      console.error('Error in deleteManager:', error);
+      res.status(500).json({ success: false, message: 'Failed to delete manager', error: error.message });
+    }
+  },
+
+  getManagerCompanies: async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const manager = await prisma.user.findUnique({
+        where: { id: parseInt(id) },
+        include: {
+          managedCompanies: {
+            include: {
+              company: true
+            }
+          }
+        }
+      });
+
+      if (!manager) {
+        return res.status(404).json({ success: false, message: 'Manager not found' });
+      }
+
+      res.json({ success: true, companies: manager.managedCompanies });
+    } catch (error) {
+      console.error('Error in getManagerCompanies:', error);
+      res.status(500).json({ success: false, message: 'Failed to fetch manager companies', error: error.message });
+    }
+  },
+
+  assignCompanyToManager: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { companyId } = req.body;
+
+      if (!companyId) {
+        return res.status(400).json({ success: false, message: 'Company ID is required' });
+      }
+
+      // Check if assignment already exists
+      const existingAssignment = await prisma.managerCompanyAssignment.findUnique({
+        where: {
+          managerId_companyId: {
+            managerId: parseInt(id),
+            companyId: parseInt(companyId)
+          }
+        }
+      });
+
+      if (existingAssignment) {
+        return res.status(400).json({ success: false, message: 'Company is already assigned to this manager' });
+      }
+
+      const assignment = await prisma.managerCompanyAssignment.create({
+        data: {
+          managerId: parseInt(id),
+          companyId: parseInt(companyId)
+        },
+        include: {
+          company: true
+        }
+      });
+
+      res.json({ success: true, assignment });
+    } catch (error) {
+      console.error('Error in assignCompanyToManager:', error);
+      res.status(500).json({ success: false, message: 'Failed to assign company to manager', error: error.message });
+    }
+  },
+
+  unassignCompanyFromManager: async (req, res) => {
+    try {
+      const { id, companyId } = req.params;
+
+      await prisma.managerCompanyAssignment.deleteMany({
+        where: {
+          managerId: parseInt(id),
+          companyId: parseInt(companyId)
+        }
+      });
+
+      res.json({ success: true, message: 'Company unassigned from manager successfully' });
+    } catch (error) {
+      console.error('Error in unassignCompanyFromManager:', error);
+      res.status(500).json({ success: false, message: 'Failed to unassign company from manager', error: error.message });
+    }
+  },
+
+  // Manager-specific functions
+  getCompanyTrainees: async (req, res) => {
+    try {
+      const { companyId } = req.params;
+      
+      const trainees = await prisma.user.findMany({
+        where: {
+          companyId: parseInt(companyId),
+          role: 'TRAINEE'
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          isVerified: true,
+          companyId: true,
+          role: true,
+          company: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        }
+      });
+
+      res.json({ success: true, trainees });
+    } catch (error) {
+      console.error('Error in getCompanyTrainees:', error);
+      res.status(500).json({ success: false, message: 'Failed to get company trainees', error: error.message });
+    }
+  },
+
+  // Comprehensive time tracking endpoint
+  getTimeTrackingStats: async (req, res) => {
+    try {
+      const { traineeId, companyId, startDate, endDate } = req.query;
+      
+      // Build where clause based on filters
+      let whereClause = {};
+      
+      if (traineeId) {
+        whereClause.userId = parseInt(traineeId);
+      }
+      
+      if (companyId) {
+        whereClause.user = {
+          companyId: parseInt(companyId)
+        };
+      }
+      
+      if (startDate || endDate) {
+        whereClause.updatedAt = {};
+        if (startDate) {
+          whereClause.updatedAt.gte = new Date(startDate);
+        }
+        if (endDate) {
+          whereClause.updatedAt.lte = new Date(endDate);
+        }
+      }
+
+      // Get all progress records with time tracking
+      const progressRecords = await prisma.traineeProgress.findMany({
+        where: whereClause,
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              company: {
+                select: {
+                  id: true,
+                  name: true
+                }
+              }
+            }
+          },
+          module: {
+            select: {
+              id: true,
+              name: true,
+              videos: {
+                select: {
+                  duration: true
+                }
+              }
+            }
+          }
+        },
+        orderBy: [
+          { userId: 'asc' },
+          { moduleId: 'asc' }
+        ]
+      });
+
+      // Calculate comprehensive time statistics
+      const stats = {
+        totalTrainees: 0,
+        totalModules: 0,
+        totalTimeSpent: 0,
+        averageTimePerTrainee: 0,
+        averageTimePerModule: 0,
+        timeDistribution: {
+          under30min: 0,
+          thirtyTo60min: 0,
+          oneTo2hours: 0,
+          twoTo4hours: 0,
+          over4hours: 0
+        },
+        traineeStats: [],
+        moduleStats: [],
+        companyStats: []
+      };
+
+      // Group by trainee
+      const traineeGroups = {};
+      progressRecords.forEach(record => {
+        const traineeId = record.userId;
+        if (!traineeGroups[traineeId]) {
+          traineeGroups[traineeId] = {
+            trainee: record.user,
+            records: [],
+            totalTime: 0,
+            completedModules: 0,
+            averageScore: 0
+          };
+        }
+        traineeGroups[traineeId].records.push(record);
+        traineeGroups[traineeId].totalTime += record.timeSpent || 0;
+        if (record.pass) {
+          traineeGroups[traineeId].completedModules++;
+        }
+      });
+
+      // Calculate trainee statistics
+      Object.values(traineeGroups).forEach(group => {
+        const totalModules = group.records.length;
+        const completedModules = group.completedModules;
+        const totalTime = group.totalTime;
+        const averageScore = totalModules > 0 ? 
+          group.records.reduce((sum, r) => sum + (r.score || 0), 0) / totalModules : 0;
+
+        stats.totalTrainees++;
+        stats.totalTimeSpent += totalTime;
+        stats.totalModules += totalModules;
+
+        // Time distribution
+        const timeInMinutes = totalTime / 60;
+        if (timeInMinutes < 30) {
+          stats.timeDistribution.under30min++;
+        } else if (timeInMinutes < 60) {
+          stats.timeDistribution.thirtyTo60min++;
+        } else if (timeInMinutes < 120) {
+          stats.timeDistribution.oneTo2hours++;
+        } else if (timeInMinutes < 240) {
+          stats.timeDistribution.twoTo4hours++;
+        } else {
+          stats.timeDistribution.over4hours++;
+        }
+
+        stats.traineeStats.push({
+          traineeId: group.trainee.id,
+          traineeName: group.trainee.name,
+          traineeEmail: group.trainee.email,
+          company: group.trainee.company,
+          totalTimeSpent: totalTime,
+          totalModules: totalModules,
+          completedModules: completedModules,
+          completionRate: totalModules > 0 ? (completedModules / totalModules) * 100 : 0,
+          averageScore: Math.round(averageScore),
+          timeInHours: Math.round(totalTime / 3600 * 10) / 10,
+          timeInMinutes: Math.round(totalTime / 60)
+        });
+      });
+
+      // Calculate averages
+      if (stats.totalTrainees > 0) {
+        stats.averageTimePerTrainee = Math.round(stats.totalTimeSpent / stats.totalTrainees);
+      }
+      if (stats.totalModules > 0) {
+        stats.averageTimePerModule = Math.round(stats.totalTimeSpent / stats.totalModules);
+      }
+
+      // Group by company for company statistics
+      const companyGroups = {};
+      stats.traineeStats.forEach(trainee => {
+        const companyId = trainee.company?.id;
+        if (companyId) {
+          if (!companyGroups[companyId]) {
+            companyGroups[companyId] = {
+              companyName: trainee.company.name,
+              traineeCount: 0,
+              totalTime: 0,
+              totalModules: 0,
+              completedModules: 0
+            };
+          }
+          companyGroups[companyId].traineeCount++;
+          companyGroups[companyId].totalTime += trainee.totalTimeSpent;
+          companyGroups[companyId].totalModules += trainee.totalModules;
+          companyGroups[companyId].completedModules += trainee.completedModules;
+        }
+      });
+
+      stats.companyStats = Object.values(companyGroups).map(company => ({
+        companyName: company.companyName,
+        traineeCount: company.traineeCount,
+        totalTimeSpent: company.totalTime,
+        averageTimePerTrainee: company.traineeCount > 0 ? 
+          Math.round(company.totalTime / company.traineeCount) : 0,
+        completionRate: company.totalModules > 0 ? 
+          (company.completedModules / company.totalModules) * 100 : 0
+      }));
+
+      // Sort trainee stats by total time spent (descending)
+      stats.traineeStats.sort((a, b) => b.totalTimeSpent - a.totalTimeSpent);
+
+      res.json({
+        success: true,
+        stats,
+        generatedAt: new Date()
+      });
+
+    } catch (error) {
+      console.error('Error in getTimeTrackingStats:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Failed to get time tracking statistics', 
+        error: error.message 
+      });
+    }
+  },
+
+  // Get all trainees with their status and company info
+  getAllTrainees: async (req, res) => {
+    try {
+      console.log('=== getAllTrainees called ===');
+      const trainees = await prisma.user.findMany({
+        where: {
+          role: 'TRAINEE'
+        },
+        include: {
+          company: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      });
+
+      console.log('Found trainees:', trainees.length);
+      console.log('Trainees data:', trainees);
+
+      res.json({
+        success: true,
+        trainees: trainees
+      });
+    } catch (error) {
+      console.error('Error fetching trainees:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch trainees',
+        error: error.message
+      });
+    }
+  },
+
+  // Update trainee status and company assignment
+  updateTrainee: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { companyId, status } = req.body;
+
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          message: 'Trainee ID is required'
+        });
+      }
+
+      const updateData = {};
+      if (companyId !== undefined) updateData.companyId = companyId;
+      if (status !== undefined) updateData.status = status;
+      if (status === 'APPROVED') updateData.isVerified = true;
+
+      const updatedTrainee = await prisma.user.update({
+        where: { id: parseInt(id) },
+        data: updateData,
+        include: {
+          company: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        }
+      });
+
+      // If approved and assigned to a company, create progress records for all company modules
+      if (status === 'APPROVED' && companyId) {
+        const companyModules = await prisma.trainingModule.findMany({
+          where: { companyId: parseInt(companyId) }
+        });
+
+        if (companyModules.length > 0) {
+          const progressRecords = companyModules.map(module => ({
+            userId: parseInt(id),
+            moduleId: module.id,
+            completed: false,
+            score: null,
+            timeSpent: 0,
+            pass: false,
+          }));
+
+          await prisma.traineeProgress.createMany({
+            data: progressRecords,
+            skipDuplicates: true // Skip if records already exist
+          });
+        }
+      }
+
+      // Send notification to trainee about status change
+      try {
+        const companyName = updatedTrainee.company?.name || null;
+        await NotificationService.notifyTraineeStatusChange(updatedTrainee, status, companyName);
+        console.log(`Notification sent to trainee ${updatedTrainee.name} about status change to ${status}`);
+      } catch (notificationError) {
+        console.error('Error sending notification to trainee:', notificationError);
+        // Don't fail the update if notification fails
+      }
+
+      res.json({
+        success: true,
+        message: 'Trainee updated successfully',
+        trainee: updatedTrainee
+      });
+    } catch (error) {
+      console.error('Error updating trainee:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to update trainee',
+        error: error.message
+      });
+    }
+  },
+
+  // Get notifications for a user
+  getNotifications: async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const { limit = 50, offset = 0 } = req.query;
+
+      const notifications = await NotificationService.getUserNotifications(
+        userId, 
+        parseInt(limit), 
+        parseInt(offset)
+      );
+
+      res.json({
+        success: true,
+        notifications
+      });
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch notifications',
+        error: error.message
+      });
+    }
+  },
+
+  // Mark notification as read
+  markNotificationAsRead: async (req, res) => {
+    try {
+      const { notificationId } = req.params;
+      const userId = req.user.id;
+
+      await NotificationService.markAsRead(parseInt(notificationId), userId);
+
+      res.json({
+        success: true,
+        message: 'Notification marked as read'
+      });
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to mark notification as read',
+        error: error.message
+      });
+    }
+  },
+
+  // Mark all notifications as read for a user
+  markAllNotificationsAsRead: async (req, res) => {
+    try {
+      const userId = req.user.id;
+
+      await NotificationService.markAllAsRead(userId);
+
+      res.json({
+        success: true,
+        message: 'All notifications marked as read'
+      });
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to mark all notifications as read',
+        error: error.message
+      });
+    }
+  },
+
+  // Get unread notification count
+  getUnreadCount: async (req, res) => {
+    try {
+      const userId = req.user.id;
+
+      const count = await NotificationService.getUnreadCount(userId);
+
+      res.json({
+        success: true,
+        unreadCount: count
+      });
+    } catch (error) {
+      console.error('Error getting unread count:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to get unread count',
+        error: error.message
+      });
+    }
+  },
+
+  // Certificate endpoints
+  generateCertificate: async (req, res) => {
+    try {
+      const { userId, companyId } = req.body;
+
+      if (!userId || !companyId) {
+        return res.status(400).json({
+          success: false,
+          message: 'User ID and Company ID are required'
+        });
+      }
+
+      const certificate = await CertificateService.generateCertificate(userId, companyId);
+
+      res.json({
+        success: true,
+        certificate: certificate,
+        message: 'Certificate generated successfully'
+      });
+    } catch (error) {
+      console.error('Error generating certificate:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to generate certificate',
+        error: error.message
+      });
+    }
+  },
+
+  getAllCertificates: async (req, res) => {
+    try {
+      const certificates = await CertificateService.getAllCertificates();
+
+      res.json({
+        success: true,
+        certificates: certificates
+      });
+    } catch (error) {
+      console.error('Error fetching certificates:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch certificates',
+        error: error.message
+      });
+    }
+  },
+
+  getCertificatesByCompany: async (req, res) => {
+    try {
+      const { companyId } = req.params;
+
+      if (!companyId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Company ID is required'
+        });
+      }
+
+      const certificates = await CertificateService.getCertificateByCompany(parseInt(companyId));
+
+      res.json({
+        success: true,
+        certificates: certificates
+      });
+    } catch (error) {
+      console.error('Error fetching company certificates:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch company certificates',
+        error: error.message
+      });
+    }
+  },
+
+  getCertificateById: async (req, res) => {
+    try {
+      const { certificateId } = req.params;
+
+      if (!certificateId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Certificate ID is required'
+        });
+      }
+
+      const certificate = await CertificateService.getCertificateById(parseInt(certificateId));
+
+      if (!certificate) {
+        return res.status(404).json({
+          success: false,
+          message: 'Certificate not found'
+        });
+      }
+
+      res.json({
+        success: true,
+        certificate: certificate
+      });
+    } catch (error) {
+      console.error('Error fetching certificate:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch certificate',
+        error: error.message
+      });
+    }
+  },
+
+  downloadCertificate: async (req, res) => {
+    try {
+      const { certificateId } = req.params;
+
+      if (!certificateId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Certificate ID is required'
+        });
+      }
+
+      const certificate = await CertificateService.getCertificateById(parseInt(certificateId));
+
+      if (!certificate) {
+        return res.status(404).json({
+          success: false,
+          message: 'Certificate not found'
+        });
+      }
+
+      if (!certificate.pdfPath) {
+        return res.status(404).json({
+          success: false,
+          message: 'Certificate PDF not found'
+        });
+      }
+
+      const filePath = path.join(__dirname, '../../', certificate.pdfPath);
+
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({
+          success: false,
+          message: 'Certificate file not found on server'
+        });
+      }
+
+      res.download(filePath, `certificate-${certificate.certificateNumber}.pdf`);
+    } catch (error) {
+      console.error('Error downloading certificate:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to download certificate',
+        error: error.message
+      });
+    }
+  },
+
+  revokeCertificate: async (req, res) => {
+    try {
+      const { certificateId } = req.params;
+
+      if (!certificateId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Certificate ID is required'
+        });
+      }
+
+      const certificate = await CertificateService.revokeCertificate(parseInt(certificateId));
+
+      res.json({
+        success: true,
+        certificate: certificate,
+        message: 'Certificate revoked successfully'
+      });
+    } catch (error) {
+      console.error('Error revoking certificate:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to revoke certificate',
+        error: error.message
+      });
+    }
+  }
 }; 

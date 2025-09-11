@@ -1,4 +1,5 @@
 const prisma = require('../prismaClient');
+const CertificateService = require('../services/certificateService');
 
 module.exports = {
   dashboard: async (req, res) => {
@@ -79,7 +80,8 @@ module.exports = {
           pass: p.pass,
           completed: p.completed,
           videoDuration: p.module.videos?.[0]?.duration || 0,
-          unlocked: isUnlocked
+          unlocked: isUnlocked,
+          isResourceModule: p.module.isResourceModule || false
         };
       });
 
@@ -228,6 +230,9 @@ module.exports = {
         data: updateData,
       });
 
+      // Check if user has completed all modules and generate certificate
+      await checkAndGenerateCertificate(userId, module.companyId);
+
       res.json({ 
         message: 'Module completed successfully! You can now access the next module.',
         hasMCQs: false,
@@ -250,7 +255,11 @@ module.exports = {
       console.log('User ID:', userId);
       console.log('Answers:', answers);
 
-      // Get all MCQs for this module
+      // Get the module and all MCQs for this module
+      const module = await prisma.trainingModule.findUnique({
+        where: { id: Number(id) }
+      });
+      
       const mcqs = await prisma.mCQ.findMany({ where: { moduleId: Number(id) } });
       
       if (mcqs.length === 0) {
@@ -316,6 +325,11 @@ module.exports = {
           pass 
         },
       });
+
+      // Check if user has completed all modules and generate certificate
+      if (pass) {
+        await checkAndGenerateCertificate(userId, module.companyId);
+      }
 
       res.json({ 
         score: scorePercentage, 
@@ -473,4 +487,210 @@ module.exports = {
       res.status(500).json({ message: 'Server error' });
     }
   },
-}; 
+
+  // Resource time tracking methods
+  updateResourceTimeTracking: async (req, res) => {
+    try {
+      const { resourceId, timeSpent } = req.body;
+      const userId = req.user.id;
+
+      if (!resourceId || timeSpent === undefined) {
+        return res.status(400).json({ success: false, message: 'Resource ID and time spent are required' });
+      }
+
+      // Upsert resource time tracking
+      const timeTracking = await prisma.resourceTimeTracking.upsert({
+        where: {
+          resourceId_userId: {
+            resourceId: parseInt(resourceId),
+            userId: userId
+          }
+        },
+        update: {
+          timeSpent: parseInt(timeSpent),
+          lastUpdated: new Date()
+        },
+        create: {
+          resourceId: parseInt(resourceId),
+          userId: userId,
+          timeSpent: parseInt(timeSpent)
+        }
+      });
+
+      return res.json({ success: true, timeTracking });
+    } catch (error) {
+      console.error('Error in updateResourceTimeTracking:', error);
+      return res.status(500).json({ success: false, message: 'Failed to update time tracking', error: error.message });
+    }
+  },
+
+  getResourceTimeTracking: async (req, res) => {
+    try {
+      const { resourceId } = req.params;
+      const userId = req.user.id;
+
+      const timeTracking = await prisma.resourceTimeTracking.findUnique({
+        where: {
+          resourceId_userId: {
+            resourceId: parseInt(resourceId),
+            userId: userId
+          }
+        }
+      });
+
+      return res.json({ success: true, timeTracking });
+    } catch (error) {
+      console.error('Error in getResourceTimeTracking:', error);
+      return res.status(500).json({ success: false, message: 'Failed to get time tracking', error: error.message });
+    }
+  },
+
+  // Certificate endpoints for trainees
+  getMyCertificates: async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const certificates = await CertificateService.getCertificateByUser(userId);
+
+      res.json({
+        success: true,
+        certificates: certificates
+      });
+    } catch (error) {
+      console.error('Error fetching trainee certificates:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch certificates',
+        error: error.message
+      });
+    }
+  },
+
+  downloadMyCertificate: async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const { certificateId } = req.params;
+
+      if (!certificateId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Certificate ID is required'
+        });
+      }
+
+      const certificate = await CertificateService.getCertificateById(parseInt(certificateId));
+
+      if (!certificate) {
+        return res.status(404).json({
+          success: false,
+          message: 'Certificate not found'
+        });
+      }
+
+      // Verify the certificate belongs to the requesting user
+      if (certificate.userId !== userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied: Certificate does not belong to you'
+        });
+      }
+
+      if (!certificate.pdfPath) {
+        return res.status(404).json({
+          success: false,
+          message: 'Certificate PDF not found'
+        });
+      }
+
+      const path = require('path');
+      const fs = require('fs');
+      const filePath = path.join(__dirname, '../../', certificate.pdfPath);
+
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({
+          success: false,
+          message: 'Certificate file not found on server'
+        });
+      }
+
+      res.download(filePath, `certificate-${certificate.certificateNumber}.pdf`);
+    } catch (error) {
+      console.error('Error downloading trainee certificate:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to download certificate',
+        error: error.message
+      });
+    }
+  },
+
+  generateMyCertificate: async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        include: { company: true }
+      });
+
+      if (!user || !user.companyId) {
+        return res.status(400).json({
+          success: false,
+          message: 'User not found or not assigned to a company'
+        });
+      }
+
+      const certificate = await CertificateService.generateCertificate(userId, user.companyId);
+
+      res.json({
+        success: true,
+        certificate: certificate,
+        message: 'Certificate generated successfully'
+      });
+    } catch (error) {
+      console.error('Error generating trainee certificate:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to generate certificate',
+        error: error.message
+      });
+    }
+  }
+};
+
+// Helper function to check if user has completed all modules and generate certificate
+async function checkAndGenerateCertificate(userId, companyId) {
+  try {
+    // Check if user has completed all modules for this company
+    const completedModules = await prisma.traineeProgress.findMany({
+      where: {
+        userId: userId,
+        isCompleted: true
+      },
+      include: {
+        module: {
+          where: { companyId: companyId }
+        }
+      }
+    });
+
+    const totalModules = await prisma.trainingModule.count({
+      where: { companyId: companyId }
+    });
+
+    console.log(`User ${userId} completed ${completedModules.length} out of ${totalModules} modules for company ${companyId}`);
+
+    // If user has completed all modules, generate certificate
+    if (completedModules.length >= totalModules) {
+      console.log(`Generating certificate for user ${userId} - all modules completed!`);
+      try {
+        await CertificateService.generateCertificate(userId, companyId);
+        console.log(`Certificate generated successfully for user ${userId}`);
+      } catch (certError) {
+        console.error(`Error generating certificate for user ${userId}:`, certError);
+        // Don't throw error - certificate generation failure shouldn't break module completion
+      }
+    }
+  } catch (error) {
+    console.error('Error in checkAndGenerateCertificate:', error);
+    // Don't throw error - certificate check failure shouldn't break module completion
+  }
+} 

@@ -15,4 +15,13 @@ router.post('/help', traineeController.requestHelp);
 router.post('/feedback', traineeController.submitFeedback);
 router.get('/feedback/:moduleId', traineeController.getFeedback);
 
+// Resource time tracking routes
+router.post('/resource-time-tracking', traineeController.updateResourceTimeTracking);
+router.get('/resource-time-tracking/:resourceId', traineeController.getResourceTimeTracking);
+
+// Certificate routes for trainees
+router.get('/certificates', traineeController.getMyCertificates);
+router.get('/certificates/:certificateId/download', traineeController.downloadMyCertificate);
+router.post('/certificates/generate', traineeController.generateMyCertificate);
+
 module.exports = router;

@@ -8,45 +8,53 @@ datasource db {
 }
 
 model User {
-  id                   Int                   @id @default(autoincrement())
+  id                   Int                        @id @default(autoincrement())
   name                 String
-  email                String                @unique
+  email                String                     @unique
   password             String
   role                 Role
   companyId            Int?
-  isVerified           Boolean               @default(false)
-  receivedMessages     ChatMessage[]         @relation("MessageReceiver")
-  sentMessages         ChatMessage[]         @relation("MessageSender")
-  chatRoomParticipants ChatRoomParticipant[] @relation("ChatRoomParticipants")
+  isVerified           Boolean                    @default(false)
+  status               UserStatus                 @default(PENDING)
+  certificates         Certificate[]
+  receivedMessages     ChatMessage[]              @relation("MessageReceiver")
+  sentMessages         ChatMessage[]              @relation("MessageSender")
+  chatRoomParticipants ChatRoomParticipant[]      @relation("ChatRoomParticipants")
   feedback             Feedback[]
   helpRequests         HelpRequest[]
   mcqAnswers           MCQAnswer[]
+  managedCompanies     ManagerCompanyAssignment[] @relation("ManagerAssignments")
   notifications        Notification[]
+  resourceTimeTracking ResourceTimeTracking[]
   progress             TraineeProgress[]
-  company              Company?              @relation(fields: [companyId], references: [id])
+  company              Company?                   @relation(fields: [companyId], references: [id])
 }
 
 model Company {
-  id        Int              @id @default(autoincrement())
-  name      String           @unique
-  logo      String?
-  chatRooms ChatRoom[]
-  modules   TrainingModule[]
-  users     User[]
+  id                 Int                        @id @default(autoincrement())
+  name               String                     @unique
+  logo               String?
+  certificates       Certificate[]
+  chatRooms          ChatRoom[]
+  managerAssignments ManagerCompanyAssignment[]
+  modules            TrainingModule[]
+  users              User[]
 }
 
 model TrainingModule {
-  id           Int               @id @default(autoincrement())
-  name         String
-  companyId    Int
-  order        Int               @default(0)
-  feedback     Feedback[]
-  helpRequests HelpRequest[]
-  mcqs         MCQ[]
-  mcqAnswers   MCQAnswer[]
-  progress     TraineeProgress[]
-  company      Company           @relation(fields: [companyId], references: [id])
-  videos       Video[]
+  id               Int               @id @default(autoincrement())
+  name             String
+  companyId        Int
+  order            Int               @default(0)
+  isResourceModule Boolean           @default(false)
+  feedback         Feedback[]
+  helpRequests     HelpRequest[]
+  mcqs             MCQ[]
+  mcqAnswers       MCQAnswer[]
+  resources        Resource[]
+  progress         TraineeProgress[]
+  company          Company           @relation(fields: [companyId], references: [id])
+  videos           Video[]
 }
 
 model Video {
@@ -172,9 +180,71 @@ model ChatMessage {
   sender      User        @relation("MessageSender", fields: [senderId], references: [id])
 }
 
+model Resource {
+  id                    Int                    @id @default(autoincrement())
+  url                   String
+  filename              String
+  originalName          String
+  filePath              String
+  type                  ResourceType
+  duration              Int?
+  estimatedReadingTime  Int?
+  moduleId              Int
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  module                TrainingModule         @relation(fields: [moduleId], references: [id])
+  timeTracking          ResourceTimeTracking[]
+}
+
+model ResourceTimeTracking {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  resourceId Int
+  timeSpent  Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now())
+  resource   Resource @relation(fields: [resourceId], references: [id])
+  user       User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, resourceId])
+}
+
+model ManagerCompanyAssignment {
+  id        Int      @id @default(autoincrement())
+  managerId Int
+  companyId Int
+  createdAt DateTime @default(now())
+  company   Company  @relation(fields: [companyId], references: [id])
+  manager   User     @relation("ManagerAssignments", fields: [managerId], references: [id])
+
+  @@unique([managerId, companyId])
+}
+
+model Certificate {
+  id                Int       @id @default(autoincrement())
+  userId            Int
+  companyId         Int
+  certificateNumber String    @unique
+  issuedAt          DateTime  @default(now())
+  completedAt       DateTime?
+  pdfPath           String?
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @default(now()) @updatedAt
+  company           Company   @relation(fields: [companyId], references: [id])
+  user              User      @relation(fields: [userId], references: [id])
+}
+
 enum Role {
   ADMIN
   TRAINEE
+  MANAGER
+}
+
+enum UserStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum HelpRequestStatus {
@@ -194,4 +264,12 @@ enum MessageType {
   FILE
   IMAGE
   SYSTEM
+}
+
+enum ResourceType {
+  VIDEO
+  PDF
+  DOCUMENT
+  IMAGE
+  AUDIO
 }

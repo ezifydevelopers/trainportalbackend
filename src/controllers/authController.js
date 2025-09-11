@@ -1,58 +1,48 @@
 const prisma = require('../prismaClient');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const NotificationService = require('../services/notificationService');
 
 module.exports = {
   signup: async (req, res) => {
     try {
       const { name, email, password, companyName } = req.body;
-      if (!name || !email || !password || !companyName) {
-        return res.status(400).json({ message: 'All fields are required' });
+      if (!name || !email || !password) {
+        return res.status(400).json({ message: 'Name, email, and password are required' });
       }
+      
       const existingUser = await prisma.user.findUnique({ where: { email } });
       if (existingUser) {
         return res.status(409).json({ message: 'Email already in use' });
       }
-      const company = await prisma.company.findUnique({ where: { name: companyName } });
-      if (!company) {
-        return res.status(404).json({ message: 'Company not found' });
-      }
+      
       const hashedPassword = await bcrypt.hash(password, 10);
+      
+      // Create user with PENDING status - no company assigned yet
       const user = await prisma.user.create({
         data: {
           name,
           email,
           password: hashedPassword,
           role: 'TRAINEE',
-          companyId: company.id,
-          isVerified: true,
+          companyId: null, // No company assigned yet
+          isVerified: false, // Not verified until approved
+          status: 'PENDING', // Pending approval
         },
       });
 
-      // Automatically assign trainee to all modules in their company
-      const companyModules = await prisma.trainingModule.findMany({
-        where: { companyId: company.id },
-      });
-
-      if (companyModules.length > 0) {
-        const progressRecords = companyModules.map(module => ({
-          userId: user.id,
-          moduleId: module.id,
-          completed: false,
-          score: null,
-          timeSpent: null,
-          pass: false,
-        }));
-
-        await prisma.traineeProgress.createMany({
-          data: progressRecords,
-        });
+      // Send notification to admins and managers about new trainee signup
+      try {
+        await NotificationService.notifyNewTraineeSignup(user);
+        console.log(`Notification sent for new trainee signup: ${user.name} (${user.email})`);
+      } catch (notificationError) {
+        console.error('Error sending notification for new trainee signup:', notificationError);
+        // Don't fail the signup if notification fails
       }
 
       return res.status(201).json({ 
-        message: 'Signup successful', 
-        user: { id: user.id, name: user.name, email: user.email },
-        modulesAssigned: companyModules.length
+        message: 'Signup successful. Your account is pending approval.', 
+        user: { id: user.id, name: user.name, email: user.email, status: user.status }
       });
     } catch (err) {
       console.error('Error in signup:', err);
@@ -73,9 +63,18 @@ module.exports = {
       if (!valid) {
         return res.status(401).json({ message: 'Invalid credentials' });
       }
-      // No isVerified check
+      
+      // Check if user is approved
+      if (user.status === 'PENDING') {
+        return res.status(403).json({ message: 'Your account is pending approval. Please wait for an administrator to approve your account.' });
+      }
+      
+      if (user.status === 'REJECTED') {
+        return res.status(403).json({ message: 'Your account has been rejected. Please contact an administrator.' });
+      }
+      
       const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
-      res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, companyId: user.companyId } });
+      res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, companyId: user.companyId, status: user.status } });
     } catch (err) {
       console.error(err);
       res.status(500).json({ message: 'Server error' });
