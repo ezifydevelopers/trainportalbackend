@@ -24,4 +24,13 @@ router.get('/users', chatController.getAllUsers);
 // Get unread message count
 router.get('/unread-count', chatController.getUnreadMessageCount);
 
+// Get recent unread messages for notifications
+router.get('/recent-messages', chatController.getRecentMessages);
+
+// Mark message as read
+router.post('/mark-read', chatController.markMessageAsRead);
+
+// Mark all messages as read
+router.post('/mark-all-read', chatController.markAllMessagesAsRead);
+
 module.exports = router;

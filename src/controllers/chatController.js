@@ -364,16 +364,183 @@ const getUnreadMessageCount = async (req, res) => {
   try {
     const currentUserId = req.user.id;
 
+    // Get all chat rooms where the user is a participant
+    const userChatRooms = await prisma.chatRoomParticipant.findMany({
+      where: {
+        userId: currentUserId,
+        isActive: true
+      },
+      select: {
+        chatRoomId: true
+      }
+    });
+
+    const chatRoomIds = userChatRooms.map(room => room.chatRoomId);
+
+    // Count unread messages in those chat rooms (excluding messages sent by the current user)
     const count = await prisma.chatMessage.count({
       where: {
-        receiverId: currentUserId,
+        chatRoomId: {
+          in: chatRoomIds
+        },
+        senderId: {
+          not: currentUserId
+        },
         isRead: false
       }
     });
 
+    console.log(`Unread message count for user ${currentUserId}: ${count}`);
     res.json({ unreadCount: count });
   } catch (error) {
     console.error('Error in getUnreadMessageCount:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Get all unread messages for notifications
+const getRecentMessages = async (req, res) => {
+  try {
+    const currentUserId = req.user.id;
+    const limit = parseInt(req.query.limit) || 50; // Increased default limit
+
+    // Get all chat rooms where the user is a participant
+    const userChatRooms = await prisma.chatRoomParticipant.findMany({
+      where: {
+        userId: currentUserId,
+        isActive: true
+      },
+      select: {
+        chatRoomId: true
+      }
+    });
+
+    const chatRoomIds = userChatRooms.map(room => room.chatRoomId);
+
+    // Get all unread messages from those chat rooms
+    const messages = await prisma.chatMessage.findMany({
+      where: {
+        chatRoomId: {
+          in: chatRoomIds
+        },
+        senderId: {
+          not: currentUserId
+        },
+        isRead: false
+      },
+      include: {
+        sender: {
+          select: {
+            id: true,
+            name: true,
+            role: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      take: limit
+    });
+
+    // Get total count for reference
+    const totalUnreadCount = await prisma.chatMessage.count({
+      where: {
+        chatRoomId: {
+          in: chatRoomIds
+        },
+        senderId: {
+          not: currentUserId
+        },
+        isRead: false
+      }
+    });
+
+    res.json({ 
+      success: true,
+      messages: messages,
+      totalUnread: totalUnreadCount,
+      showing: messages.length
+    });
+  } catch (error) {
+    console.error('Error in getRecentMessages:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Mark message as read
+const markMessageAsRead = async (req, res) => {
+  try {
+    const currentUserId = req.user.id;
+    const { chatRoomId, messageId } = req.body;
+
+    // Verify user is a participant in this chat room
+    const participant = await prisma.chatRoomParticipant.findFirst({
+      where: {
+        chatRoomId: parseInt(chatRoomId),
+        userId: currentUserId,
+        isActive: true
+      }
+    });
+
+    if (!participant) {
+      return res.status(403).json({ message: 'Access denied to this chat room' });
+    }
+
+    // Mark the message as read
+    await prisma.chatMessage.updateMany({
+      where: {
+        id: parseInt(messageId),
+        chatRoomId: parseInt(chatRoomId),
+        receiverId: currentUserId
+      },
+      data: {
+        isRead: true
+      }
+    });
+
+    res.json({ success: true, message: 'Message marked as read' });
+  } catch (error) {
+    console.error('Error in markMessageAsRead:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Mark all messages as read for the current user
+const markAllMessagesAsRead = async (req, res) => {
+  try {
+    const currentUserId = req.user.id;
+
+    // Get all chat rooms where the user is a participant
+    const userChatRooms = await prisma.chatRoomParticipant.findMany({
+      where: {
+        userId: currentUserId,
+        isActive: true
+      },
+      select: {
+        chatRoomId: true
+      }
+    });
+
+    const chatRoomIds = userChatRooms.map(room => room.chatRoomId);
+
+    // Mark all unread messages as read
+    await prisma.chatMessage.updateMany({
+      where: {
+        chatRoomId: {
+          in: chatRoomIds
+        },
+        receiverId: currentUserId,
+        isRead: false
+      },
+      data: {
+        isRead: true
+      }
+    });
+
+    res.json({ success: true, message: 'All messages marked as read' });
+  } catch (error) {
+    console.error('Error in markAllMessagesAsRead:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -384,5 +551,8 @@ module.exports = {
   getChatRoomMessages,
   sendMessage,
   getAllUsers,
-  getUnreadMessageCount
+  getUnreadMessageCount,
+  getRecentMessages,
+  markMessageAsRead,
+  markAllMessagesAsRead
 };
