@@ -6,7 +6,6 @@ const path = require('path');
 const mainRouter = require('./routes/index');
 const app = express();
 
-// limit the size of the request and response
 app.use(cors());
 app.use(express.json({ limit: "1gb" }));
 app.use(express.urlencoded({ limit: "1gb", extended: true }));
