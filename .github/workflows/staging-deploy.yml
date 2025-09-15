@@ -1,0 +1,29 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - staging
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: 22
+          script: |
+            cd ~/trainportalbackend || git clone git@github.com:ezifydevelopers/trainportalbackend.git ~/trainportalbackend
+            cd ~/trainportalbackend
+            git pull origin main
+            npm install --production
+            npx prisma migrate deploy
+            pm2 restart server || pm2 start src/server.js --name server
