@@ -6,10 +6,17 @@ const path = require('path');
 const mainRouter = require('./routes/index');
 const app = express();
 
-
+// limit the size of the request and response
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "1gb" }));
+app.use(express.urlencoded({ limit: "1gb", extended: true }));
+
+// Increase timeout for large requests
+app.use((req, res, next) => {
+  req.setTimeout(300000); // 5 minutes
+  res.setTimeout(300000); // 5 minutes
+  next(); 
+});
 
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
