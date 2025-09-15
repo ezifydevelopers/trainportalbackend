@@ -1,38 +1,29 @@
-name: Deploy to Staging
+name: Deploy
 
 on:
   push:
     branches:
-      - staging   # only deploy when staging branch is pushed
+      - staging
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Setup SSH
-        uses: webfactory/ssh-agent@v0.7.0
-        with:
-          ssh-private-key: ${{ secrets.STAGING_SSH_KEY }}
-
       - name: Deploy to VPS
-        run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} "
-            cd ~/apps/staging_project || exit 1
-
-            if [ ! -d .git ]; then
-              git clone git@github.com:ezifydevelopers/trainportalbackend.git .
-            fi
-
-            git fetch --all
-            git reset --hard origin/staging
-
-            # Install dependencies
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: 22
+          script: |
+            cd ~/trainportalbackend || git clone git@github.com:ezifydevelopers/trainportalbackend.git ~/trainportalbackend
+            cd ~/trainportalbackend
+            git pull origin main
             npm install --production
-
-            # Restart app with pm2
-            pm2 restart staging || pm2 start server.js --name staging --watch
-          "
+            npx prisma migrate deploy
+            pm2 restart server || pm2 start src/server.js --name server
