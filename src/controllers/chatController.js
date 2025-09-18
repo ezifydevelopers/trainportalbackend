@@ -99,6 +99,15 @@ const getOrCreateDirectChat = async (req, res) => {
       if (!chatRoomCompanyId) {
         return res.status(400).json({ message: 'No valid company found for chat room creation' });
       }
+
+      // If current user is a manager without a companyId, assign them to the chat room's company
+      if (!currentUser.companyId && currentUser.role === 'MANAGER') {
+        console.log('Assigning manager to company for chat functionality');
+        await prisma.user.update({
+          where: { id: currentUserId },
+          data: { companyId: chatRoomCompanyId }
+        });
+      }
       
       chatRoom = await prisma.chatRoom.create({
         data: {
@@ -205,6 +214,11 @@ const getChatRoomMessages = async (req, res) => {
     const { chatRoomId } = req.params;
     const currentUserId = req.user.id;
 
+    console.log('=== GET CHAT ROOM MESSAGES DEBUG ===');
+    console.log('Chat Room ID:', chatRoomId);
+    console.log('Current User ID:', currentUserId);
+    console.log('User Role:', req.user.role);
+
     // Verify user is a participant in this chat room
     const participant = await prisma.chatRoomParticipant.findFirst({
       where: {
@@ -214,8 +228,35 @@ const getChatRoomMessages = async (req, res) => {
       }
     });
 
+    console.log('Participant found:', participant);
+
     if (!participant) {
-      return res.status(403).json({ message: 'Access denied to this chat room' });
+      // Let's also check if the user exists in any participants for this room
+      const allParticipants = await prisma.chatRoomParticipant.findMany({
+        where: {
+          chatRoomId: parseInt(chatRoomId)
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              role: true
+            }
+          }
+        }
+      });
+      
+      console.log('All participants in this room:', allParticipants);
+      
+      return res.status(403).json({ 
+        message: 'Access denied to this chat room',
+        debug: {
+          currentUserId,
+          chatRoomId: parseInt(chatRoomId),
+          allParticipants: allParticipants.map(p => ({ userId: p.userId, userName: p.user.name, userRole: p.user.role, isActive: p.isActive }))
+        }
+      });
     }
 
     const messages = await prisma.chatMessage.findMany({
@@ -259,6 +300,12 @@ const sendMessage = async (req, res) => {
     const { chatRoomId, content, receiverId } = req.body;
     const currentUserId = req.user.id;
 
+    console.log('=== SEND MESSAGE DEBUG ===');
+    console.log('Chat Room ID:', chatRoomId);
+    console.log('Current User ID:', currentUserId);
+    console.log('User Role:', req.user.role);
+    console.log('Message content:', content);
+
     // Verify user is a participant in this chat room
     const participant = await prisma.chatRoomParticipant.findFirst({
       where: {
@@ -268,8 +315,35 @@ const sendMessage = async (req, res) => {
       }
     });
 
+    console.log('Participant found:', participant);
+
     if (!participant) {
-      return res.status(403).json({ message: 'Access denied to this chat room' });
+      // Let's also check if the user exists in any participants for this room
+      const allParticipants = await prisma.chatRoomParticipant.findMany({
+        where: {
+          chatRoomId: parseInt(chatRoomId)
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              role: true
+            }
+          }
+        }
+      });
+      
+      console.log('All participants in this room:', allParticipants);
+      
+      return res.status(403).json({ 
+        message: 'Access denied to this chat room',
+        debug: {
+          currentUserId,
+          chatRoomId: parseInt(chatRoomId),
+          allParticipants: allParticipants.map(p => ({ userId: p.userId, userName: p.user.name, userRole: p.user.role, isActive: p.isActive }))
+        }
+      });
     }
 
     const message = await prisma.chatMessage.create({

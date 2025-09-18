@@ -1489,6 +1489,16 @@ module.exports = {
       const hashedPassword = await bcrypt.hash(password, 10);
 
       console.log('Creating manager in database...');
+      // Find the first available company to assign to the manager
+      const firstCompany = await prisma.company.findFirst({
+        select: { id: true }
+      });
+
+      if (!firstCompany) {
+        console.log('No company found to assign manager to');
+        return res.status(400).json({ success: false, message: 'No company available to assign manager to' });
+      }
+
       // Create manager
       const manager = await prisma.user.create({
         data: {
@@ -1497,7 +1507,8 @@ module.exports = {
           password: hashedPassword,
           role: 'MANAGER',
           isVerified: true,
-          status: 'APPROVED'  // Managers created by admin are automatically approved
+          status: 'APPROVED',  // Managers created by admin are automatically approved
+          companyId: firstCompany.id  // Assign manager to the first available company
         }
       });
 
