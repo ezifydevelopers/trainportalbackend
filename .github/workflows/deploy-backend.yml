@@ -23,5 +23,4 @@ jobs:
             git reset --hard origin/main
             git pull origin main
             npm install
-            pm2 restart trainportal-backend || pm2 start server.js --name trainportal-backend
-
+            pm2 restart trainportalbackend || pm2 start src/server.js --name trainportalbackend
