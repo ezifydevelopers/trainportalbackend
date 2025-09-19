@@ -19,7 +19,9 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           script: |
             cd /home/staging/apps/staging/trainportalbackend
+            git fetch --all
             git reset --hard origin/main
             git pull origin main
             npm install
-            pm2 restart trainingportal-backend || pm2 start server.js --name trainportalbackend
+            pm2 restart trainportal-backend || pm2 start server.js --name trainportal-backend
+
