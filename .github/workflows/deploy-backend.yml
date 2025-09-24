@@ -2,7 +2,9 @@ name: Deploy Backend
 
 on:
   push:
-    branches: ["main"]
+    branches:
+      - main       # deploy to production
+      - staging    
 
 jobs:
   deploy:
@@ -19,6 +21,22 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           script: |
             cd /home/staging/apps/staging/trainportalbackend
+            git fetch --all
+            git reset --hard origin/main
+            git pull origin main
+            npm install
+            pm2 restart trainportalbackend || pm2 start src/server.js --name trainportalbackend
+
+      # Production deployment
+      - name: Deploy to Production VPS
+        if: github.ref == 'refs/heads/main'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USERNAME }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            cd /home/dev/apps/trainportalbackend
             git fetch --all
             git reset --hard origin/main
             git pull origin main
