@@ -11,16 +11,12 @@ module.exports = {
     try {
       res.json({ message: 'Admin API is working', timestamp: new Date() });
     } catch (err) {
-      console.error('Error in test endpoint:', err);
       res.status(500).json({ message: 'Server error' });
     }
   },
   
   getTrainees: async (req, res) => {
     try {
-      console.log('=== GET TRAINEES DEBUG ===');
-      console.log('Request headers:', req.headers);
-      console.log('User from request:', req.user);
       
       // First, check if we can connect to the database
       const trainees = await prisma.user.findMany({
@@ -39,17 +35,11 @@ module.exports = {
           }
         },
       });
-      
-      console.log('Raw trainees data:', trainees);
-      
       // Calculate progress for each trainee
       const traineesWithProgress = trainees.map(trainee => {
         try {
           const progressRecords = trainee.progress || [];
           const totalModules = progressRecords.length;
-          
-          console.log(`Processing trainee ${trainee.id}: ${totalModules} progress records`);
-          
           if (totalModules === 0) {
             return {
               ...trainee,
@@ -75,9 +65,6 @@ module.exports = {
           
           // Calculate overall progress: each module is worth equal percentage
           const overallProgress = totalModules > 0 ? (completedModules / totalModules) * 100 : 0;
-
-          console.log(`Trainee ${trainee.id} progress: ${completedModules}/${totalModules} completed, ${overallProgress}% overall, ${modulesWithScores.length} modules with scores, total time: ${totalTime} seconds, average score: ${averageScore}%`);
-
           return {
             ...trainee,
             progress: progressRecords, // Keep original progress array
@@ -91,7 +78,6 @@ module.exports = {
             }
           };
         } catch (traineeError) {
-          console.error(`Error processing trainee ${trainee.id}:`, traineeError);
           return {
             ...trainee,
             progress: [],
@@ -106,14 +92,8 @@ module.exports = {
           };
         }
       });
-      
-      console.log('Found trainees:', traineesWithProgress.length);
-      console.log('Trainees data with progress:', traineesWithProgress);
-      
       res.json(traineesWithProgress);
     } catch (err) {
-      console.error('Error in getTrainees:', err);
-      console.error('Error stack:', err.stack);
       res.status(500).json({ message: 'Server error', details: err.message });
     }
   },
@@ -169,7 +149,6 @@ module.exports = {
         modulesAssigned: companyModules.length
       });
     } catch (err) {
-      console.error('Error creating trainee:', err);
       res.status(500).json({ message: 'Server error' });
     }
   },
@@ -205,31 +184,22 @@ module.exports = {
       if (!user || user.role !== 'TRAINEE') {
         return res.status(404).json({ message: 'Trainee not found' });
       }
-
-      console.log(`Deleting trainee ${id} and related records...`);
-
       // Delete related records first to avoid foreign key constraint violations
       await prisma.$transaction(async (tx) => {
         // Delete MCQ answers for this user (if any exist)
         const deletedAnswers = await tx.mCQAnswer.deleteMany({
           where: { userId: Number(id) }
         });
-        console.log(`Deleted ${deletedAnswers.count} MCQ answers`);
-
         // Delete trainee progress records for this user (if any exist)
         const deletedProgress = await tx.traineeProgress.deleteMany({
           where: { userId: Number(id) }
         });
-        console.log(`Deleted ${deletedProgress.count} progress records`);
-
         // Finally delete the user
         await tx.user.delete({ where: { id: Number(id) } });
-        console.log(`Deleted user ${id}`);
       });
 
       res.json({ message: 'Trainee deleted successfully' });
     } catch (err) {
-      console.error('Error deleting trainee:', err);
       res.status(500).json({ message: 'Server error', details: err.message });
     }
   },
@@ -238,7 +208,6 @@ module.exports = {
       const companies = await prisma.company.findMany();
       res.json({ success: true, companies });
     } catch (err) {
-      console.error('Error in getCompanies:', err);
       res.status(500).json({ success: false, message: 'Server error', error: err.message });
     }
   },
@@ -295,10 +264,6 @@ module.exports = {
       if (!company) {
         return res.status(404).json({ message: 'Company not found' });
       }
-
-      console.log(`Deleting company ${companyId} and all related data...`);
-      console.log(`Company has ${company.users.length} trainees and ${company.modules.length} modules`);
-
       // Delete all related data in a transaction
       await prisma.$transaction(async (tx) => {
         try {
@@ -310,9 +275,7 @@ module.exports = {
               }
             }
           });
-          console.log(`Deleted ${deletedNotifications.count} notifications`);
         } catch (error) {
-          console.log('No notifications to delete or notifications table does not exist');
         }
 
         try {
@@ -324,9 +287,7 @@ module.exports = {
               }
             }
           });
-          console.log(`Deleted ${deletedFeedback.count} feedback records`);
         } catch (error) {
-          console.log('No feedback to delete or feedback table does not exist');
         }
 
         try {
@@ -338,9 +299,7 @@ module.exports = {
               }
             }
           });
-          console.log(`Deleted ${deletedHelpRequests.count} help requests`);
         } catch (error) {
-          console.log('No help requests to delete or help requests table does not exist');
         }
 
         try {
@@ -352,9 +311,7 @@ module.exports = {
               }
             }
           });
-          console.log(`Deleted ${deletedChatMessages.count} chat messages`);
         } catch (error) {
-          console.log('No chat messages to delete or chat messages table does not exist');
         }
 
         try {
@@ -366,9 +323,7 @@ module.exports = {
               }
             }
           });
-          console.log(`Deleted ${deletedChatParticipants.count} chat room participants`);
         } catch (error) {
-          console.log('No chat room participants to delete or chat room participants table does not exist');
         }
 
         try {
@@ -378,9 +333,7 @@ module.exports = {
               companyId: companyId
             }
           });
-          console.log(`Deleted ${deletedChatRooms.count} chat rooms`);
         } catch (error) {
-          console.log('No chat rooms to delete or chat rooms table does not exist');
         }
 
         try {
@@ -392,9 +345,7 @@ module.exports = {
               }
             }
           });
-          console.log(`Deleted ${deletedMcqAnswers.count} MCQ answers`);
         } catch (error) {
-          console.log('No MCQ answers to delete or MCQ answers table does not exist');
         }
 
         try {
@@ -406,9 +357,7 @@ module.exports = {
               }
             }
           });
-          console.log(`Deleted ${deletedProgress.count} progress records`);
         } catch (error) {
-          console.log('No trainee progress to delete or trainee progress table does not exist');
         }
 
         try {
@@ -420,9 +369,7 @@ module.exports = {
               }
             }
           });
-          console.log(`Deleted ${deletedTraineeMcqAnswers.count} trainee MCQ answers`);
         } catch (error) {
-          console.log('No trainee MCQ answers to delete or trainee MCQ answers table does not exist');
         }
 
         try {
@@ -434,9 +381,7 @@ module.exports = {
               }
             }
           });
-          console.log(`Deleted ${deletedTraineeProgress.count} trainee progress records`);
         } catch (error) {
-          console.log('No trainee progress to delete or trainee progress table does not exist');
         }
 
         try {
@@ -448,9 +393,7 @@ module.exports = {
               }
             }
           });
-          console.log(`Deleted ${deletedMcqs.count} MCQs`);
         } catch (error) {
-          console.log('No MCQs to delete or MCQs table does not exist');
         }
 
         try {
@@ -462,9 +405,7 @@ module.exports = {
               }
             }
           });
-          console.log(`Deleted ${deletedVideos.count} videos`);
         } catch (error) {
-          console.log('No videos to delete or videos table does not exist');
         }
 
         try {
@@ -474,9 +415,7 @@ module.exports = {
               companyId: companyId
             }
           });
-          console.log(`Deleted ${deletedModules.count} modules`);
         } catch (error) {
-          console.log('No modules to delete or modules table does not exist');
         }
 
         try {
@@ -486,9 +425,7 @@ module.exports = {
               companyId: companyId
             }
           });
-          console.log(`Deleted ${deletedTrainees.count} trainees`);
         } catch (error) {
-          console.log('No trainees to delete or trainees table does not exist');
         }
 
         try {
@@ -496,16 +433,13 @@ module.exports = {
           await tx.company.delete({
             where: { id: companyId }
           });
-          console.log(`Deleted company ${companyId}`);
         } catch (error) {
-          console.error('Failed to delete company:', error);
           throw new Error(`Failed to delete company: ${error.message}`);
         }
       });
 
       res.json({ message: 'Company and all related data deleted successfully' });
     } catch (err) {
-      console.error('Error deleting company:', err);
       res.status(500).json({ message: 'Server error', details: err.message });
     }
   },
@@ -513,20 +447,11 @@ module.exports = {
     try {
       const { id } = req.params; 
       const { name, isResourceModule } = req.body;
-      
-      console.log('=== ADD MODULE DEBUG ===');
-      console.log('Company ID:', id);
-      console.log('Module name:', name);
-      console.log('Is Resource Module:', isResourceModule);
-      console.log('Request body:', req.body);
-      
       if (!name) {
-        console.log('Validation failed: Module name is required');
         return res.status(400).json({ message: 'Module name is required' });
       }
       
       // Check if company exists
-      console.log('Checking if company exists...');
       const company = await prisma.company.findUnique({
         where: { id: Number(id) },
         include: {
@@ -537,14 +462,8 @@ module.exports = {
       });
       
       if (!company) {
-        console.log('Company not found with ID:', id);
         return res.status(404).json({ message: 'Company not found' });
       }
-
-      console.log('Company found:', company.name);
-      console.log('Trainees in company:', company.users.length);
-
-      console.log('Creating module...');
       const module = await prisma.trainingModule.create({
         data: {
           name,
@@ -552,12 +471,8 @@ module.exports = {
           isResourceModule: Boolean(isResourceModule),
         },
       });
-
-      console.log('Module created successfully:', module);
-
       // Automatically assign all trainees in this company to the new module
       if (company.users.length > 0) {
-        console.log('Assigning trainees to module...');
         const progressRecords = company.users.map(user => ({
           userId: user.id,
           moduleId: module.id,
@@ -570,20 +485,13 @@ module.exports = {
         await prisma.traineeProgress.createMany({
           data: progressRecords,
         });
-        console.log('Trainees assigned successfully');
       }
-
-      console.log('Module creation completed successfully');
       res.status(201).json({
         message: 'Module created and assigned to trainees',
         module,
         traineesAssigned: company.users.length
       });
     } catch (err) {
-      console.error('=== ADD MODULE ERROR ===');
-      console.error('Error details:', err);
-      console.error('Error message:', err.message);
-      console.error('Error stack:', err.stack);
       res.status(500).json({ message: 'Server error', details: err.message });
     }
   },
@@ -604,10 +512,6 @@ module.exports = {
     try {
       const { id } = req.params;
       const moduleId = Number(id);
-
-      console.log('=== DELETE MODULE DEBUG ===');
-      console.log('Module ID to delete:', moduleId);
-
       // Check if module exists
       const module = await prisma.trainingModule.findUnique({
         where: { id: moduleId },
@@ -620,87 +524,50 @@ module.exports = {
       });
 
       if (!module) {
-        console.log('Module not found with ID:', moduleId);
         return res.status(404).json({ message: 'Module not found' });
       }
-
-      console.log('Module found:', {
-        id: module.id,
-        name: module.name,
-        mcqsCount: module.mcqs?.length || 0,
-        hasVideo: !!module.videos?.lengths,
-        progressCount: module.progress?.length || 0,
-        mcqAnswersCount: module.mcqAnswers?.length || 0
-      });
-
       // Delete related records first (due to foreign key constraints)
-      console.log('Deleting related records...');
-
       // Delete MCQ answers first (they reference MCQs)
       const deletedAnswers = await prisma.mCQAnswer.deleteMany({
         where: { moduleId },
       });
-      console.log('Deleted MCQ answers:', deletedAnswers.count);
-
       // Delete MCQs
       const deletedMCQs = await prisma.mCQ.deleteMany({
         where: { moduleId },
       });
-      console.log('Deleted MCQs:', deletedMCQs.count);
-
       // Delete video
       const deletedVideos = await prisma.video.deleteMany({
         where: { moduleId },
       });
-      console.log('Deleted videos:', deletedVideos.count);
-
       // Delete trainee progress
       const deletedProgress = await prisma.traineeProgress.deleteMany({
         where: { moduleId },
       });
-      console.log('Deleted progress records:', deletedProgress.count);
-
       // Delete help requests
       const deletedHelpRequests = await prisma.helpRequest.deleteMany({
         where: { moduleId },
       });
-      console.log('Deleted help requests:', deletedHelpRequests.count);
-
       // Delete feedback
       const deletedFeedback = await prisma.feedback.deleteMany({
         where: { moduleId },
       });
-      console.log('Deleted feedback:', deletedFeedback.count);
-
       // Delete resources
       const deletedResources = await prisma.resource.deleteMany({
         where: { moduleId },
       });
-      console.log('Deleted resources:', deletedResources.count);
-
       // Finally delete the module
-      console.log('Deleting module...');
       await prisma.trainingModule.delete({
         where: { id: moduleId },
       });
-
-      console.log('Module deleted successfully');
       res.json({ message: 'Module deleted successfully' });
     } catch (err) {
-      console.error('=== DELETE MODULE ERROR ===');
-      console.error('Error details:', err);
-      console.error('Error message:', err.message);
-      console.error('Error stack:', err.stack);
-      
       // Check for specific error types
       if (err.code === 'P2003') {
-        console.error('Foreign key constraint violation');
         res.status(400).json({ 
           message: 'Cannot delete module: It has related data that must be deleted first',
           details: err.message 
         });
       } else if (err.code === 'P2025') {
-        console.error('Record not found');
         res.status(404).json({ 
           message: 'Module not found',
           details: err.message 
@@ -717,36 +584,20 @@ module.exports = {
     try {
       const { id } = req.params; 
       const { duration } = req.body;
-      
-      console.log('=== ADD VIDEO DEBUG ===');
-      console.log('Module ID:', id);
-      console.log('Duration:', duration);
-      console.log('Duration type:', typeof duration);
-      console.log('File:', req.file);
-      
       if (!req.file) {
-        console.log('Validation failed: No video file uploaded');
         return res.status(400).json({ message: 'Video file is required' });
       }
       
       if (!duration) {
-        console.log('Validation failed: No duration provided');
         return res.status(400).json({ message: 'Video duration is required' });
       }
 
       // Validate and sanitize duration
       let videoDuration = Number(duration);
       if (isNaN(videoDuration) || !isFinite(videoDuration) || videoDuration <= 0) {
-        console.log('Invalid duration value:', duration);
         return res.status(400).json({ message: 'Invalid video duration. Please provide a valid positive number.' });
       }
-
-      console.log('Validated duration:', videoDuration);
-
-      console.log('Deleting existing videos for module...');
       await prisma.video.deleteMany({ where: { moduleId: Number(id) } });
-      
-      console.log('Creating new video record...');
       const video = await prisma.video.create({
         data: {
           url: `/uploads/${req.file.filename}`,
@@ -754,14 +605,8 @@ module.exports = {
           moduleId: Number(id),
         },
       });
-      
-      console.log('Video created successfully:', video);
       res.status(201).json(video);
     } catch (err) {
-      console.error('=== ADD VIDEO ERROR ===');
-      console.error('Error details:', err);
-      console.error('Error message:', err.message);
-      console.error('Error stack:', err.stack);
       res.status(500).json({ message: 'Server error', details: err.message });
     }
   },
@@ -769,23 +614,13 @@ module.exports = {
     try {
       const { id } = req.params; 
       const { mcqs } = req.body;
-      
-      console.log('=== ADD MCQS DEBUG ===');
-      console.log('Module ID:', id);
-      console.log('Request body:', req.body);
-      console.log('MCQs data:', mcqs);
-      console.log('MCQs type:', typeof mcqs);
       console.log('MCQs is array:', Array.isArray(mcqs));
-      console.log('MCQs length:', mcqs ? mcqs.length : 'undefined');
-      
       if (!Array.isArray(mcqs)) {
-        console.log('Validation failed: MCQs is not an array');
         return res.status(400).json({ message: 'MCQs must be an array' });
       }
       
       // Allow empty arrays (for removing all MCQs)
       if (mcqs.length === 0) {
-        console.log('MCQs array is empty, deleting all existing MCQs for module');
         // Delete existing MCQ answers first (to handle foreign key constraints)
         await prisma.mCQAnswer.deleteMany({ where: { moduleId: Number(id) } });
         // Then delete MCQs
@@ -797,43 +632,28 @@ module.exports = {
       // Validate each MCQ
       for (let i = 0; i < mcqs.length; i++) {
         const mcq = mcqs[i];
-        console.log(`Validating MCQ ${i + 1}:`, mcq);
-        
         if (!mcq.question || !mcq.options || !mcq.answer) {
-          console.log(`MCQ ${i + 1} validation failed: missing required fields`);
-          console.log(`Question: ${mcq.question}`);
-          console.log(`Options: ${mcq.options}`);
-          console.log(`Answer: ${mcq.answer}`);
           return res.status(400).json({ 
             message: `MCQ ${i + 1} is missing required fields (question, options, or answer)` 
           });
         }
         
         if (!Array.isArray(mcq.options) || mcq.options.length < 2) {
-          console.log(`MCQ ${i + 1} validation failed: options must be an array with at least 2 items`);
           return res.status(400).json({ 
             message: `MCQ ${i + 1} must have at least 2 options` 
           });
         }
         
         if (!mcq.options.includes(mcq.answer)) {
-          console.log(`MCQ ${i + 1} validation failed: answer must be one of the options`);
-          console.log(`Answer: ${mcq.answer}`);
-          console.log(`Options: ${mcq.options}`);
           return res.status(400).json({ 
             message: `MCQ ${i + 1} answer must be one of the provided options` 
           });
         }
       }
-      
-      console.log('All MCQs validated successfully. Creating MCQs in database...');
-      
       // Delete existing MCQ answers first (to handle foreign key constraints)
-      console.log('Deleting existing MCQ answers for module...');
       await prisma.mCQAnswer.deleteMany({ where: { moduleId: Number(id) } });
       
       // Delete existing MCQs for this module (to handle updates)
-      console.log('Deleting existing MCQs for module...');
       await prisma.mCQ.deleteMany({ where: { moduleId: Number(id) } });
       
       const created = await prisma.mCQ.createMany({
@@ -845,14 +665,8 @@ module.exports = {
           moduleId: Number(id),
         })),
       });
-      
-      console.log('MCQs created successfully:', created);
       res.status(201).json({ count: created.count });
     } catch (err) {
-      console.error('=== ADD MCQS ERROR ===');
-      console.error('Error details:', err);
-      console.error('Error message:', err.message);
-      console.error('Error stack:', err.stack);
       res.status(500).json({ message: 'Server error', details: err.message });
     }
   },
@@ -941,7 +755,6 @@ module.exports = {
         lastUpdated: new Date()
       });
     } catch (err) {
-      console.error('Error in getTraineeProgress:', err);
       res.status(500).json({ message: 'Server error' });
     }
   },
@@ -998,7 +811,6 @@ module.exports = {
         modules: modules.map(m => ({ id: m.id, name: m.name }))
       });
     } catch (err) {
-      console.error('Error assigning trainee to modules:', err);
       res.status(500).json({ message: 'Server error' });
     }
   },
@@ -1057,7 +869,6 @@ module.exports = {
         modules: companyModules.map(m => ({ id: m.id, name: m.name }))
       });
     } catch (err) {
-      console.error('Error assigning trainee to company modules:', err);
       res.status(500).json({ message: 'Server error' });
     }
   },
@@ -1105,7 +916,6 @@ module.exports = {
       });
       res.json(modules);
     } catch (err) {
-      console.error(err);
       res.status(500).json({ message: 'Server error' });
     }
   },
@@ -1146,7 +956,6 @@ module.exports = {
       
       res.json(helpRequests);
     } catch (err) {
-      console.error('Error getting help requests:', err);
       res.status(500).json({ message: 'Server error' });
     }
   },
@@ -1174,7 +983,6 @@ module.exports = {
         helpRequest
       });
     } catch (err) {
-      console.error('Error in updateHelpRequest:', err);
       res.status(500).json({ message: 'Server error' });
     }
   },
@@ -1198,7 +1006,6 @@ module.exports = {
       
       res.json(feedback);
     } catch (err) {
-      console.error('Error in getAllFeedback:', err);
       res.status(500).json({ message: 'Server error' });
     }
   },
@@ -1225,7 +1032,6 @@ module.exports = {
       
       res.json(feedback);
     } catch (err) {
-      console.error('Error in getFeedbackByModule:', err);
       res.status(500).json({ message: 'Server error' });
     }
   },
@@ -1269,7 +1075,6 @@ module.exports = {
         moduleFeedback: moduleFeedbackWithNames
       });
     } catch (err) {
-      console.error('Error in getFeedbackStats:', err);
       res.status(500).json({ message: 'Server error' });
     }
   },
@@ -1327,7 +1132,6 @@ module.exports = {
 
       return res.json({ success: true, message: 'Module order updated successfully' });
     } catch (error) {
-      console.error('Error in reorderModules:', error);
       return res.status(500).json({ success: false, message: 'Failed to update module orders', error: error.message });
     }
   },
@@ -1335,11 +1139,6 @@ module.exports = {
   // Resource management methods
   addResource: async (req, res) => {
     try {
-      console.log('=== ADD RESOURCE DEBUG ===');
-      console.log('Request file:', req.file);
-      console.log('Request body:', req.body);
-      console.log('Request headers:', req.headers);
-
       if (!req.file) {
         return res.status(400).json({ success: false, message: 'No file uploaded' });
       }
@@ -1363,16 +1162,12 @@ module.exports = {
           moduleId: parseInt(moduleId)
         }
       });
-
-      console.log('Resource created successfully:', resource);
-
       return res.json({ 
         success: true, 
         message: 'Resource uploaded successfully',
         resource: resource
       });
     } catch (error) {
-      console.error('Error in addResource:', error);
       return res.status(500).json({ success: false, message: 'Failed to upload resource', error: error.message });
     }
   },
@@ -1403,7 +1198,6 @@ module.exports = {
 
       return res.json({ success: true, resources: transformedResources });
     } catch (error) {
-      console.error('Error in getModuleResources:', error);
       return res.status(500).json({ success: false, message: 'Failed to fetch resources', error: error.message });
     }
   },
@@ -1435,7 +1229,6 @@ module.exports = {
 
       return res.json({ success: true, message: 'Resource deleted successfully' });
     } catch (error) {
-      console.error('Error in deleteResource:', error);
       return res.status(500).json({ success: false, message: 'Failed to delete resource', error: error.message });
     }
   },
@@ -1456,46 +1249,33 @@ module.exports = {
 
       res.json({ success: true, managers });
     } catch (error) {
-      console.error('Error in getManagers:', error);
       res.status(500).json({ success: false, message: 'Failed to fetch managers', error: error.message });
     }
   },
 
   createManager: async (req, res) => {
     try {
-      console.log('=== CREATE MANAGER DEBUG ===');
-      console.log('Request body:', req.body);
-      
       const { name, email, password } = req.body;
 
       if (!name || !email || !password) {
-        console.log('Missing required fields:', { name: !!name, email: !!email, password: !!password });
         return res.status(400).json({ success: false, message: 'Name, email, and password are required' });
       }
-
-      console.log('Checking if user already exists...');
       // Check if user already exists
       const existingUser = await prisma.user.findUnique({
         where: { email }
       });
 
       if (existingUser) {
-        console.log('User already exists:', existingUser.email);
         return res.status(400).json({ success: false, message: 'User with this email already exists' });
       }
-
-      console.log('Hashing password...');
       // Hash password
       const hashedPassword = await bcrypt.hash(password, 10);
-
-      console.log('Creating manager in database...');
       // Find the first available company to assign to the manager
       const firstCompany = await prisma.company.findFirst({
         select: { id: true }
       });
 
       if (!firstCompany) {
-        console.log('No company found to assign manager to');
         return res.status(400).json({ success: false, message: 'No company available to assign manager to' });
       }
 
@@ -1511,11 +1291,8 @@ module.exports = {
           companyId: firstCompany.id  // Assign manager to the first available company
         }
       });
-
-      console.log('Manager created successfully:', manager);
       res.json({ success: true, manager });
     } catch (error) {
-      console.error('Error in createManager:', error);
       res.status(500).json({ success: false, message: 'Failed to create manager', error: error.message });
     }
   },
@@ -1545,7 +1322,6 @@ module.exports = {
 
       res.json({ success: true, manager });
     } catch (error) {
-      console.error('Error in updateManager:', error);
       res.status(500).json({ success: false, message: 'Failed to update manager', error: error.message });
     }
   },
@@ -1560,7 +1336,6 @@ module.exports = {
 
       res.json({ success: true, message: 'Manager deleted successfully' });
     } catch (error) {
-      console.error('Error in deleteManager:', error);
       res.status(500).json({ success: false, message: 'Failed to delete manager', error: error.message });
     }
   },
@@ -1586,7 +1361,6 @@ module.exports = {
 
       res.json({ success: true, companies: manager.managedCompanies });
     } catch (error) {
-      console.error('Error in getManagerCompanies:', error);
       res.status(500).json({ success: false, message: 'Failed to fetch manager companies', error: error.message });
     }
   },
@@ -1626,7 +1400,6 @@ module.exports = {
 
       res.json({ success: true, assignment });
     } catch (error) {
-      console.error('Error in assignCompanyToManager:', error);
       res.status(500).json({ success: false, message: 'Failed to assign company to manager', error: error.message });
     }
   },
@@ -1644,8 +1417,196 @@ module.exports = {
 
       res.json({ success: true, message: 'Company unassigned from manager successfully' });
     } catch (error) {
-      console.error('Error in unassignCompanyFromManager:', error);
       res.status(500).json({ success: false, message: 'Failed to unassign company from manager', error: error.message });
+    }
+  },
+
+  // Duplicate company data functionality
+  duplicateCompanyData: async (req, res) => {
+    try {
+      const { sourceCompanyId, targetCompanyId } = req.body;
+
+      // Validate input
+      if (!sourceCompanyId || !targetCompanyId) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Source and target company IDs are required' 
+        });
+      }
+
+      if (sourceCompanyId === targetCompanyId) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Source and target companies cannot be the same' 
+        });
+      }
+
+      // Check if both companies exist
+      const [sourceCompany, targetCompany] = await Promise.all([
+        prisma.Company.findUnique({ 
+          where: { id: parseInt(sourceCompanyId) },
+          include: {
+            modules: {
+              include: {
+                videos: true,
+                mcqs: true,
+                resources: true
+              }
+            }
+          }
+        }),
+        prisma.Company.findUnique({ 
+          where: { id: parseInt(targetCompanyId) } 
+        })
+      ]);
+
+      if (!sourceCompany) {
+        return res.status(404).json({ 
+          success: false, 
+          message: 'Source company not found' 
+        });
+      }
+
+      if (!targetCompany) {
+        return res.status(404).json({ 
+          success: false, 
+          message: 'Target company not found' 
+        });
+      }
+
+      // Check if target company already has modules
+      const existingModules = await prisma.TrainingModule.findMany({
+        where: { companyId: parseInt(targetCompanyId) }
+      });
+
+      if (existingModules.length > 0) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Target company already has modules. Please clear existing modules first.' 
+        });
+      }
+
+      // Get all trainees in target company for progress assignment
+      const targetTrainees = await prisma.User.findMany({
+        where: { 
+          companyId: parseInt(targetCompanyId),
+          role: 'TRAINEE'
+        }
+      });
+
+      // Duplicate all data in a transaction
+      const result = await prisma.$transaction(async (tx) => {
+        const duplicatedModules = [];
+        const duplicatedVideos = [];
+        const duplicatedMCQs = [];
+        const duplicatedResources = [];
+        const progressRecords = [];
+
+        // Duplicate modules and their related data
+        for (const sourceModule of sourceCompany.modules) {
+          // Create new module
+          const newModule = await tx.TrainingModule.create({
+            data: {
+              name: sourceModule.name,
+              companyId: parseInt(targetCompanyId),
+              order: sourceModule.order,
+              isResourceModule: sourceModule.isResourceModule
+            }
+          });
+          duplicatedModules.push(newModule);
+
+          // Duplicate videos
+          for (const sourceVideo of sourceModule.videos) {
+            const newVideo = await tx.Video.create({
+              data: {
+                url: sourceVideo.url,
+                duration: sourceVideo.duration,
+                moduleId: newModule.id
+              }
+            });
+            duplicatedVideos.push(newVideo);
+          }
+
+          // Duplicate MCQs
+          for (const sourceMCQ of sourceModule.mcqs) {
+            const newMCQ = await tx.MCQ.create({
+              data: {
+                question: sourceMCQ.question,
+                options: sourceMCQ.options,
+                answer: sourceMCQ.answer,
+                explanation: sourceMCQ.explanation,
+                moduleId: newModule.id
+              }
+            });
+            duplicatedMCQs.push(newMCQ);
+          }
+
+          // Duplicate resources
+          for (const sourceResource of sourceModule.resources) {
+            const newResource = await tx.Resource.create({
+              data: {
+                url: sourceResource.url,
+                filename: sourceResource.filename,
+                originalName: sourceResource.originalName,
+                filePath: sourceResource.filePath,
+                type: sourceResource.type,
+                duration: sourceResource.duration,
+                estimatedReadingTime: sourceResource.estimatedReadingTime,
+                moduleId: newModule.id
+              }
+            });
+            duplicatedResources.push(newResource);
+          }
+
+          // Create progress records for all trainees in target company
+          for (const trainee of targetTrainees) {
+            progressRecords.push({
+              userId: trainee.id,
+              moduleId: newModule.id,
+              completed: false,
+              score: null,
+              timeSpent: null,
+              pass: false
+            });
+          }
+        }
+
+        // Create all progress records
+        if (progressRecords.length > 0) {
+          await tx.TraineeProgress.createMany({
+            data: progressRecords
+          });
+        }
+
+        return {
+          modules: duplicatedModules,
+          videos: duplicatedVideos,
+          mcqs: duplicatedMCQs,
+          resources: duplicatedResources,
+          progressRecords: progressRecords.length
+        };
+      });
+
+      res.json({
+        success: true,
+        message: `Successfully duplicated ${sourceCompany.name} data to ${targetCompany.name}`,
+        data: {
+          sourceCompany: sourceCompany.name,
+          targetCompany: targetCompany.name,
+          duplicatedModules: result.modules.length,
+          duplicatedVideos: result.videos.length,
+          duplicatedMCQs: result.mcqs.length,
+          duplicatedResources: result.resources.length,
+          progressRecordsCreated: result.progressRecords
+        }
+      });
+
+    } catch (error) {
+      res.status(500).json({ 
+        success: false, 
+        message: 'Failed to duplicate company data', 
+        error: error.message 
+      });
     }
   },
 
@@ -1677,7 +1638,6 @@ module.exports = {
 
       res.json({ success: true, trainees });
     } catch (error) {
-      console.error('Error in getCompanyTrainees:', error);
       res.status(500).json({ success: false, message: 'Failed to get company trainees', error: error.message });
     }
   },
@@ -1874,7 +1834,6 @@ module.exports = {
       });
 
     } catch (error) {
-      console.error('Error in getTimeTrackingStats:', error);
       res.status(500).json({ 
         success: false, 
         message: 'Failed to get time tracking statistics', 
@@ -1886,7 +1845,6 @@ module.exports = {
   // Get all trainees with their status and company info
   getAllTrainees: async (req, res) => {
     try {
-      console.log('=== getAllTrainees called ===');
       const trainees = await prisma.user.findMany({
         where: {
           role: 'TRAINEE'
@@ -1903,16 +1861,11 @@ module.exports = {
           createdAt: 'desc'
         }
       });
-
-      console.log('Found trainees:', trainees.length);
-      console.log('Trainees data:', trainees);
-
       res.json({
         success: true,
         trainees: trainees
       });
     } catch (error) {
-      console.error('Error fetching trainees:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch trainees',
@@ -1979,9 +1932,7 @@ module.exports = {
       try {
         const companyName = updatedTrainee.company?.name || null;
         await NotificationService.notifyTraineeStatusChange(updatedTrainee, status, companyName);
-        console.log(`Notification sent to trainee ${updatedTrainee.name} about status change to ${status}`);
       } catch (notificationError) {
-        console.error('Error sending notification to trainee:', notificationError);
         // Don't fail the update if notification fails
       }
 
@@ -1991,7 +1942,6 @@ module.exports = {
         trainee: updatedTrainee
       });
     } catch (error) {
-      console.error('Error updating trainee:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to update trainee',
@@ -2017,7 +1967,6 @@ module.exports = {
         notifications
       });
     } catch (error) {
-      console.error('Error fetching notifications:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch notifications',
@@ -2039,7 +1988,6 @@ module.exports = {
         message: 'Notification marked as read'
       });
     } catch (error) {
-      console.error('Error marking notification as read:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to mark notification as read',
@@ -2060,7 +2008,6 @@ module.exports = {
         message: 'All notifications marked as read'
       });
     } catch (error) {
-      console.error('Error marking all notifications as read:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to mark all notifications as read',
@@ -2081,7 +2028,6 @@ module.exports = {
         unreadCount: count
       });
     } catch (error) {
-      console.error('Error getting unread count:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to get unread count',
@@ -2110,7 +2056,6 @@ module.exports = {
         message: 'Certificate generated successfully'
       });
     } catch (error) {
-      console.error('Error generating certificate:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to generate certificate',
@@ -2128,7 +2073,6 @@ module.exports = {
         certificates: certificates
       });
     } catch (error) {
-      console.error('Error fetching certificates:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch certificates',
@@ -2155,7 +2099,6 @@ module.exports = {
         certificates: certificates
       });
     } catch (error) {
-      console.error('Error fetching company certificates:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch company certificates',
@@ -2189,7 +2132,6 @@ module.exports = {
         certificate: certificate
       });
     } catch (error) {
-      console.error('Error fetching certificate:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch certificate',
@@ -2236,7 +2178,6 @@ module.exports = {
 
       res.download(filePath, `certificate-${certificate.certificateNumber}.pdf`);
     } catch (error) {
-      console.error('Error downloading certificate:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to download certificate',
@@ -2264,7 +2205,6 @@ module.exports = {
         message: 'Certificate revoked successfully'
       });
     } catch (error) {
-      console.error('Error revoking certificate:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to revoke certificate',

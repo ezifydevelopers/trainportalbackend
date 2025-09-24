@@ -7,10 +7,6 @@ module.exports = async function (req, res, next) {
   
   // Add debugging for chat routes
   if (req.path.includes('/chat/')) {
-    console.log('=== AUTH MIDDLEWARE DEBUG ===');
-    console.log('Request path:', req.path);
-    console.log('Auth header:', authHeader);
-    console.log('Token:', token ? 'Present' : 'Missing');
   }
   
   if (!token) return res.status(401).json({ message: 'No token provided' });
@@ -23,12 +19,10 @@ module.exports = async function (req, res, next) {
     
     // Add debugging for chat routes
     if (req.path.includes('/chat/')) {
-      console.log('User authenticated:', { id: user.id, role: user.role, companyId: user.companyId });
     }
     
     next();
   } catch (err) {
-    console.error('Auth middleware error:', err.message);
     return res.status(401).json({ message: 'Invalid token' });
   }
 }; 

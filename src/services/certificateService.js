@@ -78,7 +78,6 @@ class CertificateService {
       return updatedCertificate;
 
     } catch (error) {
-      console.error('Error generating certificate:', error);
       throw error;
     }
   }

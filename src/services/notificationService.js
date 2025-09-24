@@ -16,7 +16,6 @@ class NotificationService {
       });
       return notification;
     } catch (error) {
-      console.error('Error creating notification:', error);
       throw error;
     }
   }
@@ -44,11 +43,8 @@ class NotificationService {
           this.createNotification(user.id, type, title, message, metadata)
         )
       );
-
-      console.log(`Created ${notifications.length} notifications for admins and managers`);
       return notifications;
     } catch (error) {
-      console.error('Error notifying admins and managers:', error);
       throw error;
     }
   }
@@ -111,7 +107,6 @@ class NotificationService {
 
       return notifications;
     } catch (error) {
-      console.error('Error fetching user notifications:', error);
       throw error;
     }
   }
@@ -131,7 +126,6 @@ class NotificationService {
 
       return notification;
     } catch (error) {
-      console.error('Error marking notification as read:', error);
       throw error;
     }
   }
@@ -151,7 +145,6 @@ class NotificationService {
 
       return result;
     } catch (error) {
-      console.error('Error marking all notifications as read:', error);
       throw error;
     }
   }
@@ -168,7 +161,6 @@ class NotificationService {
 
       return count;
     } catch (error) {
-      console.error('Error getting unread count:', error);
       throw error;
     }
   }
@@ -187,11 +179,8 @@ class NotificationService {
           status: 'READ'
         }
       });
-
-      console.log(`Deleted ${result.count} old notifications`);
       return result;
     } catch (error) {
-      console.error('Error deleting old notifications:', error);
       throw error;
     }
   }

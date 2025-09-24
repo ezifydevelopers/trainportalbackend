@@ -18,9 +18,6 @@ class WebSocketHandler {
         ws.close(1008, 'User ID required');
         return;
       }
-
-      console.log(`WebSocket connected: User ${userId}`);
-      
       // Store client connection
       this.clients.set(parseInt(userId), ws);
       
@@ -36,13 +33,11 @@ class WebSocketHandler {
           const message = JSON.parse(data);
           this.handleMessage(parseInt(userId), message);
         } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
         }
       });
 
       // Handle client disconnect
       ws.on('close', () => {
-        console.log(`WebSocket disconnected: User ${userId}`);
         this.clients.delete(parseInt(userId));
         
         // Remove user from all chat rooms
@@ -59,7 +54,6 @@ class WebSocketHandler {
 
       // Handle errors
       ws.on('error', (error) => {
-        console.error(`WebSocket error for user ${userId}:`, error);
       });
     });
   }
@@ -85,7 +79,6 @@ class WebSocketHandler {
         this.handleModuleCompletion(userId, message.data);
         break;
       default:
-        console.log(`Unknown message type: ${message.type}`);
     }
   }
 
@@ -100,20 +93,17 @@ class WebSocketHandler {
       if (roomUserId !== userId) { // Don't send back to sender
         const client = this.clients.get(roomUserId);
         if (client && client.readyState === WebSocket.OPEN) {
-          console.log(`Sending message to user ${roomUserId}`);
           client.send(JSON.stringify({
             type: 'NEW_MESSAGE',
             data: messageData
           }));
         } else {
-          console.log(`User ${roomUserId} client not available or not open`);
         }
       }
     });
     
     // If no users in room, log for debugging
     if (usersInRoom.size === 0) {
-      console.log(`No users in chat room ${chatRoomId}, message not broadcast`);
     }
   }
 
@@ -143,8 +133,6 @@ class WebSocketHandler {
       this.chatRooms.set(chatRoomId, new Set());
     }
     this.chatRooms.get(chatRoomId).add(userId);
-    
-    console.log(`User ${userId} joined chat room ${chatRoomId}`);
     console.log(`Users in chat room ${chatRoomId}:`, Array.from(this.chatRooms.get(chatRoomId)));
   }
 
@@ -156,15 +144,12 @@ class WebSocketHandler {
         this.chatRooms.delete(chatRoomId);
       }
     }
-    
-    console.log(`User ${userId} left chat room ${chatRoomId}`);
     if (usersInRoom) {
       console.log(`Remaining users in chat room ${chatRoomId}:`, Array.from(usersInRoom));
     }
   }
 
   handleUserOnline(userId) {
-    console.log(`User ${userId} is online`);
     // Broadcast user online status to all other users
     this.broadcastToAll({
       type: 'USER_ONLINE',
@@ -173,7 +158,6 @@ class WebSocketHandler {
   }
 
   handleModuleCompletion(userId, data) {
-    console.log(`Module completion notification from user ${userId}:`, data);
     // Broadcast module completion to all users
     this.broadcastToAll({
       type: 'MODULE_COMPLETION',
@@ -202,10 +186,8 @@ class WebSocketHandler {
       if (userId !== excludeUserId) {
         const client = this.clients.get(userId);
         if (client && client.readyState === WebSocket.OPEN) {
-          console.log(`📤 Sending to user ${userId}`);
           client.send(JSON.stringify(message));
         } else {
-          console.log(`⚠️ User ${userId} client not available or not open`);
         }
       } else {
         console.log(`⏭️ Skipping user ${userId} (excluded)`);
@@ -215,12 +197,6 @@ class WebSocketHandler {
 
   // Method to be called from other parts of the application
   broadcastMessage(chatRoomId, message) {
-    console.log(`📡 Broadcasting message to chat room ${chatRoomId}:`, {
-      messageId: message.id,
-      senderId: message.senderId,
-      content: message.content
-    });
-    
     this.broadcastToChatRoom(chatRoomId, {
       type: 'NEW_MESSAGE',
       data: message

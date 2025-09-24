@@ -29,6 +29,7 @@ router.get('/companies', adminController.getCompanies);
 router.post('/companies', uploadLogo.single('logo'), adminController.createCompany);
 router.put('/companies/:id', uploadLogo.single('logo'), adminController.updateCompany);
 router.delete('/companies/:id', adminController.deleteCompany);
+router.post('/companies/duplicate-data', adminController.duplicateCompanyData);
 
 router.get('/modules', adminController.getAllModules);
 router.post('/companies/:id/modules', adminController.addModule);

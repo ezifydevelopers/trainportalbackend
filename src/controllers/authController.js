@@ -36,7 +36,6 @@ module.exports = {
         await NotificationService.notifyNewTraineeSignup(user);
         console.log(`Notification sent for new trainee signup: ${user.name} (${user.email})`);
       } catch (notificationError) {
-        console.error('Error sending notification for new trainee signup:', notificationError);
         // Don't fail the signup if notification fails
       }
 
@@ -45,7 +44,6 @@ module.exports = {
         user: { id: user.id, name: user.name, email: user.email, status: user.status }
       });
     } catch (err) {
-      console.error('Error in signup:', err);
       return res.status(500).json({ message: 'Server error' });
     }
   },
@@ -76,7 +74,6 @@ module.exports = {
       const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
       res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, companyId: user.companyId, status: user.status } });
     } catch (err) {
-      console.error(err);
       res.status(500).json({ message: 'Server error' });
     }
   },
@@ -105,7 +102,6 @@ module.exports = {
       });
       return res.status(201).json({ message: 'Admin signup successful', user: { id: user.id, name: user.name, email: user.email, role: user.role } });
     } catch (err) {
-      console.error(err);
       return res.status(500).json({ message: 'Server error' });
     }
   },
@@ -126,7 +122,6 @@ module.exports = {
       const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
       res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
     } catch (err) {
-      console.error(err);
       res.status(500).json({ message: 'Server error' });
     }
   },

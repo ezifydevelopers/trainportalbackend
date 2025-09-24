@@ -3,16 +3,12 @@ const prisma = require('../prismaClient');
 // Get or create a direct chat room between two users
 const getOrCreateDirectChat = async (req, res) => {
   try {
-    console.log('=== CHAT DIRECT DEBUG ===');
-    console.log('Request headers:', req.headers);
-    console.log('Request user:', req.user);
-    console.log('Participant ID:', req.params.participantId);
-    
+
     const { participantId } = req.params;
     const currentUserId = req.user?.id;
     
     if (!currentUserId) {
-      console.log('No user ID found in request');
+
       return res.status(401).json({ message: 'User not authenticated' });
     }
 
@@ -102,7 +98,7 @@ const getOrCreateDirectChat = async (req, res) => {
 
       // If current user is a manager without a companyId, assign them to the chat room's company
       if (!currentUser.companyId && currentUser.role === 'MANAGER') {
-        console.log('Assigning manager to company for chat functionality');
+
         await prisma.user.update({
           where: { id: currentUserId },
           data: { companyId: chatRoomCompanyId }
@@ -150,7 +146,7 @@ const getOrCreateDirectChat = async (req, res) => {
 
     res.json(chatRoom);
   } catch (error) {
-    console.error('Error in getOrCreateDirectChat:', error);
+
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -203,7 +199,7 @@ const getUserChatRooms = async (req, res) => {
 
     res.json(chatRooms);
   } catch (error) {
-    console.error('Error in getUserChatRooms:', error);
+
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -214,11 +210,6 @@ const getChatRoomMessages = async (req, res) => {
     const { chatRoomId } = req.params;
     const currentUserId = req.user.id;
 
-    console.log('=== GET CHAT ROOM MESSAGES DEBUG ===');
-    console.log('Chat Room ID:', chatRoomId);
-    console.log('Current User ID:', currentUserId);
-    console.log('User Role:', req.user.role);
-
     // Verify user is a participant in this chat room
     const participant = await prisma.chatRoomParticipant.findFirst({
       where: {
@@ -227,8 +218,6 @@ const getChatRoomMessages = async (req, res) => {
         isActive: true
       }
     });
-
-    console.log('Participant found:', participant);
 
     if (!participant) {
       // Let's also check if the user exists in any participants for this room
@@ -246,9 +235,7 @@ const getChatRoomMessages = async (req, res) => {
           }
         }
       });
-      
-      console.log('All participants in this room:', allParticipants);
-      
+
       return res.status(403).json({ 
         message: 'Access denied to this chat room',
         debug: {
@@ -289,7 +276,7 @@ const getChatRoomMessages = async (req, res) => {
 
     res.json(messages);
   } catch (error) {
-    console.error('Error in getChatRoomMessages:', error);
+
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -300,12 +287,6 @@ const sendMessage = async (req, res) => {
     const { chatRoomId, content, receiverId } = req.body;
     const currentUserId = req.user.id;
 
-    console.log('=== SEND MESSAGE DEBUG ===');
-    console.log('Chat Room ID:', chatRoomId);
-    console.log('Current User ID:', currentUserId);
-    console.log('User Role:', req.user.role);
-    console.log('Message content:', content);
-
     // Verify user is a participant in this chat room
     const participant = await prisma.chatRoomParticipant.findFirst({
       where: {
@@ -314,8 +295,6 @@ const sendMessage = async (req, res) => {
         isActive: true
       }
     });
-
-    console.log('Participant found:', participant);
 
     if (!participant) {
       // Let's also check if the user exists in any participants for this room
@@ -333,9 +312,7 @@ const sendMessage = async (req, res) => {
           }
         }
       });
-      
-      console.log('All participants in this room:', allParticipants);
-      
+
       return res.status(403).json({ 
         message: 'Access denied to this chat room',
         debug: {
@@ -387,12 +364,12 @@ const sendMessage = async (req, res) => {
         chatRoomId: parseInt(chatRoomId)
       });
     } else {
-      console.log('⚠️ WebSocket handler not available');
+
     }
 
     res.json(message);
   } catch (error) {
-    console.error('Error in sendMessage:', error);
+
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -428,7 +405,7 @@ const getAllUsers = async (req, res) => {
 
     res.json(users);
   } catch (error) {
-    console.error('Error in getCompanyUsers:', error);
+
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -464,10 +441,9 @@ const getUnreadMessageCount = async (req, res) => {
       }
     });
 
-    console.log(`Unread message count for user ${currentUserId}: ${count}`);
     res.json({ unreadCount: count });
   } catch (error) {
-    console.error('Error in getUnreadMessageCount:', error);
+
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -537,7 +513,7 @@ const getRecentMessages = async (req, res) => {
       showing: messages.length
     });
   } catch (error) {
-    console.error('Error in getRecentMessages:', error);
+
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -575,7 +551,7 @@ const markMessageAsRead = async (req, res) => {
 
     res.json({ success: true, message: 'Message marked as read' });
   } catch (error) {
-    console.error('Error in markMessageAsRead:', error);
+
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -614,7 +590,7 @@ const markAllMessagesAsRead = async (req, res) => {
 
     res.json({ success: true, message: 'All messages marked as read' });
   } catch (error) {
-    console.error('Error in markAllMessagesAsRead:', error);
+
     res.status(500).json({ message: 'Internal server error' });
   }
 };

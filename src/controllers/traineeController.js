@@ -22,17 +22,8 @@ module.exports = {
         orderBy: { module: { order: 'asc' } },
       });
 
-      console.log('=== DASHBOARD DEBUG ===');
-      console.log('User ID:', userId);
-      console.log('Total progress records:', progressRecords.length);
       progressRecords.forEach((record, index) => {
-        console.log(`Progress record ${index + 1}:`, {
-          moduleId: record.moduleId,
-          moduleName: record.module.name,
-          completed: record.completed,
-          pass: record.pass,
-          score: record.score
-        });
+
       });
 
       const totalModules = progressRecords.length;
@@ -45,8 +36,9 @@ module.exports = {
       // Find current module (first incomplete module that is unlocked)
       let currentModule = null;
       for (let i = 0; i < progressRecords.length; i++) {
-        const isUnlocked = i === 0 || 
-          (i > 0 && progressRecords[i - 1].completed && progressRecords[i - 1].pass);
+        // Always unlock resource modules, otherwise use sequential logic
+        const isUnlocked = progressRecords[i].module.isResourceModule || 
+          (i === 0 || (i > 0 && progressRecords[i - 1].completed && progressRecords[i - 1].pass));
         
         if (isUnlocked && !progressRecords[i].completed) {
           currentModule = {
@@ -60,8 +52,9 @@ module.exports = {
 
       // Create module progress array with unlock status
       const moduleProgress = progressRecords.map((p, index) => {
-        const isUnlocked = index === 0 || 
-          (index > 0 && progressRecords[index - 1].completed && progressRecords[index - 1].pass);
+        // Always unlock resource modules, otherwise use sequential logic
+        const isUnlocked = p.module.isResourceModule || 
+          (index === 0 || (index > 0 && progressRecords[index - 1].completed && progressRecords[index - 1].pass));
 
         console.log(`Module ${index + 1} (${p.module.name}):`, {
           id: p.module.id,
@@ -102,7 +95,7 @@ module.exports = {
         lastUpdated: new Date()
       });
     } catch (err) {
-      console.error('Error in dashboard:', err);
+
       res.status(500).json({ message: 'Server error' });
     }
   },
@@ -142,7 +135,7 @@ module.exports = {
 
       res.json(modules);
     } catch (err) {
-      console.error('Error in listModules:', err);
+
       res.status(500).json({ message: 'Server error' });
     }
   },
@@ -173,7 +166,7 @@ module.exports = {
 
       res.json(progress.module);
     } catch (err) {
-      console.error('Error in getModule:', err);
+
       res.status(500).json({ message: 'Server error' });
     }
   },
@@ -182,10 +175,6 @@ module.exports = {
     try {
       const { id } = req.params;
       const userId = req.user.id;
-
-      console.log('=== COMPLETE MODULE DEBUG ===');
-      console.log('Module ID:', id);
-      console.log('User ID:', userId);
 
       // Get the module to check if it has MCQs
       const module = await prisma.trainingModule.findUnique({
@@ -198,8 +187,6 @@ module.exports = {
       if (!module) {
         return res.status(404).json({ message: 'Module not found' });
       }
-
-      console.log('Module MCQs count:', module.mcqs?.length || 0);
 
       // If module has no MCQs, mark as completed and passed
       // If module has MCQs, don't mark as completed (user needs to take quiz)
@@ -222,8 +209,6 @@ module.exports = {
         score: 100
       };
 
-      console.log('Update data:', updateData);
-
       // Mark the module as completed for this user
       const progress = await prisma.traineeProgress.updateMany({
         where: { userId, moduleId: Number(id) },
@@ -239,7 +224,7 @@ module.exports = {
         autoPassed: true
       });
     } catch (err) {
-      console.error('Error in completeModule:', err);
+
       res.status(500).json({ message: 'Server error' });
     }
   },
@@ -249,11 +234,6 @@ module.exports = {
       const { id } = req.params;
       const userId = req.user.id;
       const { answers } = req.body;
-
-      console.log('=== SUBMIT MCQ DEBUG ===');
-      console.log('Module ID:', id);
-      console.log('User ID:', userId);
-      console.log('Answers:', answers);
 
       // Get the module and all MCQs for this module
       const module = await prisma.trainingModule.findUnique({
@@ -266,19 +246,16 @@ module.exports = {
         return res.status(400).json({ message: 'No MCQs found for this module' });
       }
 
-      console.log('Found MCQs:', mcqs.length);
-
       // Calculate correct answers
       let correctAnswers = 0;
       const answerRecords = [];
 
       for (const mcq of mcqs) {
         const userAnswer = answers[mcq.id];
-        console.log(`MCQ ${mcq.id}: User answer = "${userAnswer}", Correct answer = "${mcq.answer}"`);
-        
+
         // Handle undefined or null answers
         if (!userAnswer || userAnswer === undefined || userAnswer === null) {
-          console.log(`MCQ ${mcq.id}: No answer provided, marking as incorrect`);
+
           answerRecords.push({
             userId,
             moduleId: Number(id),
@@ -290,8 +267,7 @@ module.exports = {
         }
 
         const isCorrect = userAnswer === mcq.answer;
-        console.log(`MCQ ${mcq.id}: isCorrect = ${isCorrect}`);
-        
+
         if (isCorrect) correctAnswers++;
 
         answerRecords.push({
@@ -303,9 +279,6 @@ module.exports = {
         });
       }
 
-      console.log('Answer records to save:', answerRecords);
-      console.log('Correct answers:', correctAnswers, 'out of', mcqs.length);
-
       // Save all answers
       await prisma.mCQAnswer.createMany({
         data: answerRecords
@@ -314,8 +287,6 @@ module.exports = {
       // Calculate score as percentage and pass/fail (pass if score >= 70%)
       const scorePercentage = Math.round((correctAnswers / mcqs.length) * 100);
       const pass = scorePercentage >= 70;
-
-      console.log('Final score:', scorePercentage, '%, Pass:', pass);
 
       const updated = await prisma.traineeProgress.updateMany({
         where: { userId, moduleId: Number(id) },
@@ -338,10 +309,7 @@ module.exports = {
         correctAnswers 
       });
     } catch (err) {
-      console.error('=== SUBMIT MCQ ERROR ===');
-      console.error('Error details:', err);
-      console.error('Error message:', err.message);
-      console.error('Error stack:', err.stack);
+
       res.status(500).json({ message: 'Server error', details: err.message });
     }
   },
@@ -359,7 +327,7 @@ module.exports = {
 
       res.json({ message: 'Time spent updated' });
     } catch (err) {
-      console.error('Error in updateTimeSpent:', err);
+
       res.status(500).json({ message: 'Server error' });
     }
   },
@@ -391,7 +359,7 @@ module.exports = {
         }
       });
     } catch (err) {
-      console.error('Error in requestHelp:', err);
+
       res.status(500).json({ message: 'Server error' });
     }
   },
@@ -457,7 +425,7 @@ module.exports = {
         }
       });
     } catch (err) {
-      console.error('Error in submitFeedback:', err);
+
       res.status(500).json({ message: 'Server error' });
     }
   },
@@ -483,7 +451,7 @@ module.exports = {
 
       res.json(feedback);
     } catch (err) {
-      console.error('Error in getFeedback:', err);
+
       res.status(500).json({ message: 'Server error' });
     }
   },
@@ -519,7 +487,7 @@ module.exports = {
 
       return res.json({ success: true, timeTracking });
     } catch (error) {
-      console.error('Error in updateResourceTimeTracking:', error);
+
       return res.status(500).json({ success: false, message: 'Failed to update time tracking', error: error.message });
     }
   },
@@ -540,7 +508,7 @@ module.exports = {
 
       return res.json({ success: true, timeTracking });
     } catch (error) {
-      console.error('Error in getResourceTimeTracking:', error);
+
       return res.status(500).json({ success: false, message: 'Failed to get time tracking', error: error.message });
     }
   },
@@ -556,7 +524,7 @@ module.exports = {
         certificates: certificates
       });
     } catch (error) {
-      console.error('Error fetching trainee certificates:', error);
+
       res.status(500).json({
         success: false,
         message: 'Failed to fetch certificates',
@@ -614,7 +582,7 @@ module.exports = {
 
       res.download(filePath, `certificate-${certificate.certificateNumber}.pdf`);
     } catch (error) {
-      console.error('Error downloading trainee certificate:', error);
+
       res.status(500).json({
         success: false,
         message: 'Failed to download certificate',
@@ -646,7 +614,7 @@ module.exports = {
         message: 'Certificate generated successfully'
       });
     } catch (error) {
-      console.error('Error generating trainee certificate:', error);
+
       res.status(500).json({
         success: false,
         message: 'Failed to generate certificate',
@@ -676,21 +644,19 @@ async function checkAndGenerateCertificate(userId, companyId) {
       where: { companyId: companyId }
     });
 
-    console.log(`User ${userId} completed ${completedModules.length} out of ${totalModules} modules for company ${companyId}`);
-
     // If user has completed all modules, generate certificate
     if (completedModules.length >= totalModules) {
-      console.log(`Generating certificate for user ${userId} - all modules completed!`);
+
       try {
         await CertificateService.generateCertificate(userId, companyId);
-        console.log(`Certificate generated successfully for user ${userId}`);
+
       } catch (certError) {
-        console.error(`Error generating certificate for user ${userId}:`, certError);
+
         // Don't throw error - certificate generation failure shouldn't break module completion
       }
     }
   } catch (error) {
-    console.error('Error in checkAndGenerateCertificate:', error);
+
     // Don't throw error - certificate check failure shouldn't break module completion
   }
 } 

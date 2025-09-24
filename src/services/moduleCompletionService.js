@@ -34,7 +34,6 @@ class ModuleCompletionService {
         await this.checkTraineeCompletion(trainee);
       }
     } catch (error) {
-      console.error('Error checking module completions:', error);
     }
   }
 
@@ -90,12 +89,9 @@ class ModuleCompletionService {
               }
             });
           }
-
-          console.log(`🎉 Trainee ${trainee.name} has completed all ${totalModules} modules!`);
         }
       }
     } catch (error) {
-      console.error(`Error checking completion for trainee ${trainee.id}:`, error);
     }
   }
 
@@ -118,7 +114,6 @@ class ModuleCompletionService {
         await this.checkTraineeCompletion(trainee);
       }
     } catch (error) {
-      console.error(`Error checking completion for trainee ${traineeId}:`, error);
     }
   }
 

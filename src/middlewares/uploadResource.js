@@ -16,10 +16,6 @@ const storage = multer.diskStorage({
 
 // File filter function
 const fileFilter = (req, file, cb) => {
-  console.log('File filter - Original name:', file.originalname);
-  console.log('File filter - MIME type:', file.mimetype);
-  console.log('File filter - Size:', file.size);
-
   // Allowed MIME types
   const allowedMimeTypes = [
     'video/mp4',
@@ -52,8 +48,6 @@ const fileFilter = (req, file, cb) => {
 
   // Check MIME type
   const isAllowed = allowedMimeTypes.includes(file.mimetype);
-  console.log('File filter - Is allowed:', isAllowed);
-
   if (isAllowed) {
     cb(null, true);
   } else {
