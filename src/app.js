@@ -10,14 +10,14 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
 
-app.use('/uploads/resources', express.static(path.join(__dirname, '../uploads/resources')));
+app.use('/uploads/resources', express.static(path.join(__dirname, '../../uploads/resources')));
 
 // Test endpoint to verify static file serving
 app.get('/test-uploads', (req, res) => {
   const fs = require('fs');
-  const uploadsPath = path.join(__dirname, '../uploads');
+  const uploadsPath = path.join(__dirname, '../../uploads');
   try {
     const files = fs.readdirSync(uploadsPath);
     res.json({ 
