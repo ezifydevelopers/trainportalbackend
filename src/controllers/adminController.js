@@ -17,6 +17,11 @@ module.exports = {
   
   getTrainees: async (req, res) => {
     try {
+      console.log('Fetching trainees...');
+      
+      // Test database connection first
+      await prisma.$connect();
+      console.log('Database connected successfully');
       
       // First, check if we can connect to the database
       const trainees = await prisma.user.findMany({
@@ -35,6 +40,8 @@ module.exports = {
           }
         },
       });
+      
+      console.log(`Found ${trainees.length} trainees`);
       // Calculate progress for each trainee
       const traineesWithProgress = trainees.map(trainee => {
         try {
@@ -94,7 +101,13 @@ module.exports = {
       });
       res.json(traineesWithProgress);
     } catch (err) {
-      res.status(500).json({ message: 'Server error', details: err.message });
+      console.error('Error in getTrainees:', err);
+      console.error('Error stack:', err.stack);
+      res.status(500).json({ 
+        message: 'Server error', 
+        details: err.message,
+        error: process.env.NODE_ENV === 'development' ? err.stack : undefined
+      });
     }
   },
   createTrainee: async (req, res) => {
@@ -1443,7 +1456,7 @@ module.exports = {
 
       // Check if both companies exist
       const [sourceCompany, targetCompany] = await Promise.all([
-        prisma.Company.findUnique({ 
+        prisma.company.findUnique({ 
           where: { id: parseInt(sourceCompanyId) },
           include: {
             modules: {
@@ -1455,7 +1468,7 @@ module.exports = {
             }
           }
         }),
-        prisma.Company.findUnique({ 
+        prisma.company.findUnique({ 
           where: { id: parseInt(targetCompanyId) } 
         })
       ]);
@@ -1475,7 +1488,7 @@ module.exports = {
       }
 
       // Check if target company already has modules
-      const existingModules = await prisma.TrainingModule.findMany({
+      const existingModules = await prisma.trainingModule.findMany({
         where: { companyId: parseInt(targetCompanyId) }
       });
 
