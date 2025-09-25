@@ -1437,7 +1437,9 @@ module.exports = {
   // Duplicate company data functionality
   duplicateCompanyData: async (req, res) => {
     try {
+      console.log('Starting duplicate company data process...');
       const { sourceCompanyId, targetCompanyId } = req.body;
+      console.log('Request body:', { sourceCompanyId, targetCompanyId });
 
       // Validate input
       if (!sourceCompanyId || !targetCompanyId) {
@@ -1500,7 +1502,7 @@ module.exports = {
       }
 
       // Get all trainees in target company for progress assignment
-      const targetTrainees = await prisma.User.findMany({
+      const targetTrainees = await prisma.user.findMany({
         where: { 
           companyId: parseInt(targetCompanyId),
           role: 'TRAINEE'
@@ -1518,7 +1520,7 @@ module.exports = {
         // Duplicate modules and their related data
         for (const sourceModule of sourceCompany.modules) {
           // Create new module
-          const newModule = await tx.TrainingModule.create({
+          const newModule = await tx.trainingModule.create({
             data: {
               name: sourceModule.name,
               companyId: parseInt(targetCompanyId),
@@ -1530,7 +1532,7 @@ module.exports = {
 
           // Duplicate videos
           for (const sourceVideo of sourceModule.videos) {
-            const newVideo = await tx.Video.create({
+            const newVideo = await tx.video.create({
               data: {
                 url: sourceVideo.url,
                 duration: sourceVideo.duration,
@@ -1542,7 +1544,7 @@ module.exports = {
 
           // Duplicate MCQs
           for (const sourceMCQ of sourceModule.mcqs) {
-            const newMCQ = await tx.MCQ.create({
+            const newMCQ = await tx.mCQ.create({
               data: {
                 question: sourceMCQ.question,
                 options: sourceMCQ.options,
@@ -1556,19 +1558,53 @@ module.exports = {
 
           // Duplicate resources
           for (const sourceResource of sourceModule.resources) {
-            const newResource = await tx.Resource.create({
-              data: {
-                url: sourceResource.url,
-                filename: sourceResource.filename,
-                originalName: sourceResource.originalName,
-                filePath: sourceResource.filePath,
-                type: sourceResource.type,
-                duration: sourceResource.duration,
-                estimatedReadingTime: sourceResource.estimatedReadingTime,
-                moduleId: newModule.id
+            try {
+              // Check if the source file exists before duplicating
+              const fs = require('fs');
+              const path = require('path');
+              // Extract just the filename from the full path if it exists
+              let filename = sourceResource.filePath;
+              if (sourceResource.filePath.includes('\\')) {
+                filename = path.basename(sourceResource.filePath);
               }
-            });
-            duplicatedResources.push(newResource);
+              const sourceFilePath = path.join(__dirname, '../../../uploads/resources', filename);
+              
+              if (fs.existsSync(sourceFilePath)) {
+                const newResource = await tx.resource.create({
+                  data: {
+                    url: sourceResource.url,
+                    filename: sourceResource.filename,
+                    originalName: sourceResource.originalName,
+                    filePath: sourceResource.filePath,
+                    type: sourceResource.type,
+                    duration: sourceResource.duration,
+                    estimatedReadingTime: sourceResource.estimatedReadingTime,
+                    moduleId: newModule.id
+                  }
+                });
+                duplicatedResources.push(newResource);
+                console.log(`Successfully duplicated resource: ${sourceResource.originalName}`);
+              } else {
+                console.warn(`Source file not found, skipping resource: ${sourceResource.originalName} (${sourceFilePath})`);
+                // Still create the resource record but with a note about missing file
+                const newResource = await tx.resource.create({
+                  data: {
+                    url: sourceResource.url,
+                    filename: sourceResource.filename,
+                    originalName: sourceResource.originalName,
+                    filePath: sourceResource.filePath,
+                    type: sourceResource.type,
+                    duration: sourceResource.duration,
+                    estimatedReadingTime: sourceResource.estimatedReadingTime,
+                    moduleId: newModule.id
+                  }
+                });
+                duplicatedResources.push(newResource);
+              }
+            } catch (fileError) {
+              console.error(`Error processing resource ${sourceResource.originalName}:`, fileError.message);
+              // Continue with other resources even if one fails
+            }
           }
 
           // Create progress records for all trainees in target company
@@ -1586,7 +1622,7 @@ module.exports = {
 
         // Create all progress records
         if (progressRecords.length > 0) {
-          await tx.TraineeProgress.createMany({
+          await tx.traineeProgress.createMany({
             data: progressRecords
           });
         }
@@ -1615,10 +1651,13 @@ module.exports = {
       });
 
     } catch (error) {
+      console.error('Error in duplicateCompanyData:', error);
+      console.error('Error stack:', error.stack);
       res.status(500).json({ 
         success: false, 
         message: 'Failed to duplicate company data', 
-        error: error.message 
+        error: error.message,
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
       });
     }
   },
