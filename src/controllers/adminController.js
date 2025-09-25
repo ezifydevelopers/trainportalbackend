@@ -1545,7 +1545,7 @@ module.exports = {
 
         // Duplicate MCQs
         for (const sourceMCQ of sourceModule.mcqs) {
-          try {
+          try { 
             const newMCQ = await tx.mCQ.create({
               data: {
                 question: sourceMCQ.question,

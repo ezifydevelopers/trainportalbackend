@@ -31,6 +31,9 @@ app.get('/test-uploads', (req, res) => {
 
 app.use('/api', mainRouter);
 
+// Direct routes for reverse proxy compatibility
+app.use('/chat', require('./routes/chat'));
+
 app.get('/', (req, res) => {
   res.send('Training Portal Backend API');
 });
