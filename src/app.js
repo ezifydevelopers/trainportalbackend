@@ -14,7 +14,7 @@ app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
 
 app.use('/uploads/resources', express.static(path.join(__dirname, '../../uploads/resources')));
 
-// Test endpoint to verify static file serving
+// Test endpoint to verify static file serving we can remove this later
 app.get('/test-uploads', (req, res) => {
   const fs = require('fs');
   const uploadsPath = path.join(__dirname, '../../uploads');
