@@ -1471,7 +1471,10 @@ module.exports = {
           }
         }),
         prisma.company.findUnique({ 
-          where: { id: parseInt(targetCompanyId) } 
+          where: { id: parseInt(targetCompanyId) },
+          include: {
+            modules: true
+          }
         })
       ]);
 
@@ -1490,16 +1493,14 @@ module.exports = {
       }
 
       // Check if target company already has modules
-      const existingModules = await prisma.trainingModule.findMany({
-        where: { companyId: parseInt(targetCompanyId) }
-      });
-
-      if (existingModules.length > 0) {
+      if (targetCompany.modules && targetCompany.modules.length > 0) {
         return res.status(400).json({ 
-          success: false, 
-          message: 'Target company already has modules. Please clear existing modules first.' 
+          success: false,
+          message: 'Target company already has modules. Please delete existing modules first or choose a different company.' 
         });
       }
+
+
 
       // Get all trainees in target company for progress assignment
       const targetTrainees = await prisma.user.findMany({
@@ -1542,8 +1543,9 @@ module.exports = {
             duplicatedVideos.push(newVideo);
           }
 
-          // Duplicate MCQs
-          for (const sourceMCQ of sourceModule.mcqs) {
+        // Duplicate MCQs
+        for (const sourceMCQ of sourceModule.mcqs) {
+          try {
             const newMCQ = await tx.mCQ.create({
               data: {
                 question: sourceMCQ.question,
@@ -1554,7 +1556,12 @@ module.exports = {
               }
             });
             duplicatedMCQs.push(newMCQ);
+            console.log(`Successfully duplicated MCQ: ${sourceMCQ.question}`);
+          } catch (mcqError) {
+            console.error(`Error duplicating MCQ: ${sourceMCQ.question}`, mcqError.message);
+            // Continue with other MCQs even if one fails
           }
+        }
 
           // Duplicate resources
           for (const sourceResource of sourceModule.resources) {
