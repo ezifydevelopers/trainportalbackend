@@ -10,9 +10,20 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
+// Serve static files with CORS headers
+app.use('/uploads', (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  next();
+}, express.static(path.join(__dirname, '../../uploads')));
 
-app.use('/uploads/resources', express.static(path.join(__dirname, '../../uploads/resources')));
+app.use('/uploads/resources', (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  next();
+}, express.static(path.join(__dirname, '../../uploads/resources')));
 
 // Test endpoint to verify static file serving we can remove this later
 app.get('/test-uploads', (req, res) => {
