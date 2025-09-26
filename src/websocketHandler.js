@@ -2,30 +2,60 @@ const WebSocket = require('ws');
 
 class WebSocketHandler {
   constructor(server) {
-    this.wss = new WebSocket.Server({ server });
+    this.wss = new WebSocket.Server({ 
+      server,
+      path: '/ws'
+    });
     this.clients = new Map(); // userId -> WebSocket
     this.chatRooms = new Map(); // chatRoomId -> Set of userIds
     
     this.setupWebSocketServer();
+    
+    // Add error handling
+    this.wss.on('error', (error) => {
+      console.error('WebSocket server error:', error);
+    });
   }
 
   setupWebSocketServer() {
+    console.log('WebSocket server listening on /ws');
+    
     this.wss.on('connection', (ws, request) => {
+      console.log('WebSocket connection attempt:', request.url);
       const url = new URL(request.url, 'http://localhost');
       const userId = url.searchParams.get('userId');
       
+      console.log('User ID from request:', userId);
+      
       if (!userId) {
+        console.log('No user ID provided, closing connection');
         ws.close(1008, 'User ID required');
         return;
       }
       // Store client connection
       this.clients.set(parseInt(userId), ws);
+      console.log(`✅ WebSocket connected for user ${userId}`);
       
       // Send connection confirmation
-      ws.send(JSON.stringify({
-        type: 'CONNECTION_ESTABLISHED',
-        data: { userId: parseInt(userId) }
-      }));
+      try {
+        ws.send(JSON.stringify({
+          type: 'CONNECTION_ESTABLISHED',
+          data: { userId: parseInt(userId) }
+        }));
+        console.log(`📤 Sent connection confirmation to user ${userId}`);
+      } catch (error) {
+        console.error(`❌ Error sending confirmation to user ${userId}:`, error);
+      }
+
+      // Handle WebSocket errors
+      ws.on('error', (error) => {
+        console.error(`❌ WebSocket error for user ${userId}:`, error);
+      });
+      
+      ws.on('close', (code, reason) => {
+        console.log(`🔌 WebSocket closed for user ${userId}, code: ${code}, reason: ${reason}`);
+        this.clients.delete(parseInt(userId));
+      });
 
       // Handle incoming messages
       ws.on('message', (data) => {

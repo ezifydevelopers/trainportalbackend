@@ -30,6 +30,8 @@ async function startServer() {
     const moduleCount = await prisma.trainingModule.count();
     // Start the server
     server.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`📡 WebSocket server listening on /ws`);
     });
     
     // Keep the server running

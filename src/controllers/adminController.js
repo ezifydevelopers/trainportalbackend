@@ -168,26 +168,82 @@ module.exports = {
   updateTrainee: async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, email, password, companyId } = req.body;
+      const { name, email, password, companyId, status } = req.body;
+
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          message: 'Trainee ID is required'
+        });
+      }
+
       const user = await prisma.user.findUnique({ where: { id: Number(id) } });
       if (!user || user.role !== 'TRAINEE') {
         return res.status(404).json({ message: 'Trainee not found' });
       }
-      let data = {};
-      if (name) data.name = name;
-      if (email) data.email = email;
-      if (companyId) {
+
+      let updateData = {};
+      if (name) updateData.name = name;
+      if (email) updateData.email = email;
+      if (password) updateData.password = await bcrypt.hash(password, 10);
+      if (companyId !== undefined) {
         const company = await prisma.company.findUnique({ where: { id: Number(companyId) } });
         if (!company) return res.status(404).json({ message: 'Company not found' });
-        data.companyId = Number(companyId);
+        updateData.companyId = Number(companyId);
       }
-      if (password) {
-        data.password = await bcrypt.hash(password, 10);
+      if (status !== undefined) {
+        updateData.status = status;
+        if (status === 'APPROVED') updateData.isVerified = true;
       }
-      const updated = await prisma.user.update({ where: { id: Number(id) }, data });
-      res.json({ message: 'Trainee updated', user: { id: updated.id, name: updated.name, email: updated.email } });
+
+      const updatedTrainee = await prisma.user.update({
+        where: { id: parseInt(id) },
+        data: updateData,
+        include: {
+          company: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        }
+      });
+
+      // If approved and assigned to a company, create progress records for all company modules
+      if (status === 'APPROVED' && companyId) {
+        const companyModules = await prisma.trainingModule.findMany({
+          where: { companyId: parseInt(companyId) }
+        });
+
+        if (companyModules.length > 0) {
+          const progressRecords = companyModules.map(module => ({
+            userId: parseInt(id),
+            moduleId: module.id,
+            completed: false,
+            score: null,
+            timeSpent: 0,
+            pass: false,
+          }));
+
+          await prisma.traineeProgress.createMany({
+            data: progressRecords,
+            skipDuplicates: true
+          });
+        }
+      }
+
+      res.json({
+        success: true,
+        message: 'Trainee updated successfully',
+        user: updatedTrainee
+      });
     } catch (err) {
-      res.status(500).json({ message: 'Server error' });
+      console.error('Error updating trainee:', err);
+      res.status(500).json({ 
+        success: false,
+        message: 'Server error',
+        error: err.message 
+      });
     }
   },
   deleteTrainee: async (req, res) => {
@@ -1933,81 +1989,6 @@ module.exports = {
     }
   },
 
-  // Update trainee status and company assignment
-  updateTrainee: async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { companyId, status } = req.body;
-
-      if (!id) {
-        return res.status(400).json({
-          success: false,
-          message: 'Trainee ID is required'
-        });
-      }
-
-      const updateData = {};
-      if (companyId !== undefined) updateData.companyId = companyId;
-      if (status !== undefined) updateData.status = status;
-      if (status === 'APPROVED') updateData.isVerified = true;
-
-      const updatedTrainee = await prisma.user.update({
-        where: { id: parseInt(id) },
-        data: updateData,
-        include: {
-          company: {
-            select: {
-              id: true,
-              name: true
-            }
-          }
-        }
-      });
-
-      // If approved and assigned to a company, create progress records for all company modules
-      if (status === 'APPROVED' && companyId) {
-        const companyModules = await prisma.trainingModule.findMany({
-          where: { companyId: parseInt(companyId) }
-        });
-
-        if (companyModules.length > 0) {
-          const progressRecords = companyModules.map(module => ({
-            userId: parseInt(id),
-            moduleId: module.id,
-            completed: false,
-            score: null,
-            timeSpent: 0,
-            pass: false,
-          }));
-
-          await prisma.traineeProgress.createMany({
-            data: progressRecords,
-            skipDuplicates: true // Skip if records already exist
-          });
-        }
-      }
-
-      // Send notification to trainee about status change
-      try {
-        const companyName = updatedTrainee.company?.name || null;
-        await NotificationService.notifyTraineeStatusChange(updatedTrainee, status, companyName);
-      } catch (notificationError) {
-        // Don't fail the update if notification fails
-      }
-
-      res.json({
-        success: true,
-        message: 'Trainee updated successfully',
-        trainee: updatedTrainee
-      });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: 'Failed to update trainee',
-        error: error.message
-      });
-    }
-  },
 
   // Get notifications for a user
   getNotifications: async (req, res) => {
