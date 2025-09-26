@@ -16,19 +16,19 @@ app.use('/uploads', (req, res, next) => {
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
   res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
   next();
-}, express.static(path.join(__dirname, '../../uploads')));
+}, express.static('/home/dev/uploads'));
 
 app.use('/uploads/resources', (req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
   res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
   next();
-}, express.static(path.join(__dirname, '../../uploads/resources')));
+}, express.static('/home/dev/uploads/resources'));
 
 // Test endpoint to verify static file serving we can remove this later
 app.get('/test-uploads', (req, res) => {
   const fs = require('fs');
-  const uploadsPath = path.join(__dirname, '../../uploads');
+  const uploadsPath = '/home/dev/uploads';
   try {
     const files = fs.readdirSync(uploadsPath);
     res.json({ 
