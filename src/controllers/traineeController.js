@@ -37,8 +37,9 @@ module.exports = {
       let currentModule = null;
       for (let i = 0; i < progressRecords.length; i++) {
         // Always unlock resource modules, otherwise use sequential logic
+        // For video modules: unlock if previous module is completed (regardless of pass status)
         const isUnlocked = progressRecords[i].module.isResourceModule || 
-          (i === 0 || (i > 0 && progressRecords[i - 1].completed && progressRecords[i - 1].pass));
+          (i === 0 || (i > 0 && progressRecords[i - 1].completed));
         
         if (isUnlocked && !progressRecords[i].completed) {
           currentModule = {
@@ -53,8 +54,10 @@ module.exports = {
       // Create module progress array with unlock status
       const moduleProgress = progressRecords.map((p, index) => {
         // Always unlock resource modules, otherwise use sequential logic
+        // For video modules: unlock if previous module is completed (regardless of pass status)
+        // For resource modules: always unlocked
         const isUnlocked = p.module.isResourceModule || 
-          (index === 0 || (index > 0 && progressRecords[index - 1].completed && progressRecords[index - 1].pass));
+          (index === 0 || (index > 0 && progressRecords[index - 1].completed));
 
         console.log(`Module ${index + 1} (${p.module.name}):`, {
           id: p.module.id,
@@ -119,9 +122,9 @@ module.exports = {
 
       const modules = progressRecords.map((p, index) => {
         // First module is always unlocked
-        // Subsequent modules are unlocked if the previous module is completed and passed
+        // Subsequent modules are unlocked if the previous module is completed (regardless of pass status)
         const isUnlocked = index === 0 || 
-          (index > 0 && progressRecords[index - 1].completed && progressRecords[index - 1].pass);
+          (index > 0 && progressRecords[index - 1].completed);
 
         return {
           moduleId: p.module.id,
@@ -200,7 +203,19 @@ module.exports = {
       const hasMCQs = module.mcqs && module.mcqs.length > 0;
       
       if (hasMCQs) {
-        // Module has MCQs - don't mark as completed, user needs to take quiz
+        // Module has MCQs - mark as completed but not passed, user needs to take quiz
+        const updateData = {
+          completed: true,
+          pass: false, // Will be updated after quiz
+          score: null  // Will be updated after quiz
+        };
+
+        // Mark the module as completed for this user
+        await prisma.traineeProgress.updateMany({
+          where: { userId, moduleId: Number(id) },
+          data: updateData,
+        });
+
         res.json({ 
           message: 'Module video completed. Please take the quiz to proceed.',
           hasMCQs: true,
