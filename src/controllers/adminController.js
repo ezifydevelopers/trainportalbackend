@@ -1603,36 +1603,42 @@ module.exports = {
             duplicatedVideos.push(newVideo);
           }
 
-        // Duplicate MCQs
-        for (const sourceMCQ of sourceModule.mcqs) {
-          try { 
-            // Explicitly extract only the fields we need, excluding any id field
-            const { id, ...mcqDataWithoutId } = sourceMCQ;
-            const mcqData = {
-              question: mcqDataWithoutId.question,
-              options: mcqDataWithoutId.options,
-              answer: mcqDataWithoutId.answer,
-              explanation: mcqDataWithoutId.explanation,
+        // Duplicate MCQs using createMany to avoid individual id conflicts
+        if (sourceModule.mcqs && sourceModule.mcqs.length > 0) {
+          try {
+            const mcqDataArray = sourceModule.mcqs.map(sourceMCQ => ({
+              question: String(sourceMCQ.question),
+              options: Array.isArray(sourceMCQ.options) ? [...sourceMCQ.options] : [],
+              answer: String(sourceMCQ.answer),
+              explanation: sourceMCQ.explanation ? String(sourceMCQ.explanation) : null,
               moduleId: newModule.id
-            };
+            }));
             
-            console.log(`Creating MCQ with data:`, JSON.stringify(mcqData, null, 2));
+            console.log(`Creating ${mcqDataArray.length} MCQs for module ${newModule.id}`);
+            console.log(`MCQ data sample:`, JSON.stringify(mcqDataArray[0], null, 2));
             
-            const newMCQ = await tx.mCQ.create({
-              data: mcqData
+            const result = await tx.mCQ.createMany({
+              data: mcqDataArray
             });
-            duplicatedMCQs.push(newMCQ);
-            console.log(`Successfully duplicated MCQ: ${sourceMCQ.question}`);
+            
+            console.log(`Successfully created ${result.count} MCQs for module ${newModule.id}`);
+            
+            // Fetch the created MCQs to add to our tracking array
+            const createdMCQs = await tx.mCQ.findMany({
+              where: { moduleId: newModule.id },
+              orderBy: { id: 'desc' },
+              take: result.count
+            });
+            duplicatedMCQs.push(...createdMCQs);
+            
           } catch (mcqError) {
-            console.error(`Error duplicating MCQ: ${sourceMCQ.question}`, mcqError.message);
-            console.error(`Source MCQ object:`, JSON.stringify(sourceMCQ, null, 2));
-            console.error(`MCQ data being sent:`, JSON.stringify({
-              question: sourceMCQ.question,
-              options: sourceMCQ.options,
-              answer: sourceMCQ.answer,
-              explanation: sourceMCQ.explanation,
-              moduleId: newModule.id
-            }, null, 2));
+            console.error(`Error duplicating MCQs for module ${newModule.id}:`, mcqError.message);
+            console.error(`MCQ data array:`, JSON.stringify(sourceModule.mcqs.map(mcq => ({
+              question: mcq.question,
+              options: mcq.options,
+              answer: mcq.answer,
+              explanation: mcq.explanation
+            })), null, 2));
             throw mcqError; // Re-throw to abort the transaction
           }
         }
