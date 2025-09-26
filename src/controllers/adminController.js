@@ -760,6 +760,8 @@ module.exports = {
           module: {
             include: {
               videos: true,
+              mcqs: true,
+              resources: true
             },
           },
         },
@@ -1590,10 +1592,11 @@ module.exports = {
 
           // Duplicate videos
           for (const sourceVideo of sourceModule.videos) {
+            const { id, ...videoDataWithoutId } = sourceVideo;
             const newVideo = await tx.video.create({
               data: {
-                url: sourceVideo.url,
-                duration: sourceVideo.duration,
+                url: videoDataWithoutId.url,
+                duration: videoDataWithoutId.duration,
                 moduleId: newModule.id
               }
             });
@@ -1603,14 +1606,17 @@ module.exports = {
         // Duplicate MCQs
         for (const sourceMCQ of sourceModule.mcqs) {
           try { 
-            // Ensure we only pass the required fields and exclude any id field
+            // Explicitly extract only the fields we need, excluding any id field
+            const { id, ...mcqDataWithoutId } = sourceMCQ;
             const mcqData = {
-              question: sourceMCQ.question,
-              options: sourceMCQ.options,
-              answer: sourceMCQ.answer,
-              explanation: sourceMCQ.explanation,
+              question: mcqDataWithoutId.question,
+              options: mcqDataWithoutId.options,
+              answer: mcqDataWithoutId.answer,
+              explanation: mcqDataWithoutId.explanation,
               moduleId: newModule.id
             };
+            
+            console.log(`Creating MCQ with data:`, JSON.stringify(mcqData, null, 2));
             
             const newMCQ = await tx.mCQ.create({
               data: mcqData
@@ -1619,7 +1625,7 @@ module.exports = {
             console.log(`Successfully duplicated MCQ: ${sourceMCQ.question}`);
           } catch (mcqError) {
             console.error(`Error duplicating MCQ: ${sourceMCQ.question}`, mcqError.message);
-            console.error(`MCQ data:`, JSON.stringify(sourceMCQ, null, 2));
+            console.error(`Source MCQ object:`, JSON.stringify(sourceMCQ, null, 2));
             console.error(`MCQ data being sent:`, JSON.stringify({
               question: sourceMCQ.question,
               options: sourceMCQ.options,
@@ -1645,15 +1651,16 @@ module.exports = {
               const sourceFilePath = path.join(__dirname, '../../../uploads/resources', filename);
               
               if (fs.existsSync(sourceFilePath)) {
+                const { id, ...resourceDataWithoutId } = sourceResource;
                 const newResource = await tx.resource.create({
                   data: {
-                    url: sourceResource.url,
-                    filename: sourceResource.filename,
-                    originalName: sourceResource.originalName,
-                    filePath: sourceResource.filePath,
-                    type: sourceResource.type,
-                    duration: sourceResource.duration,
-                    estimatedReadingTime: sourceResource.estimatedReadingTime,
+                    url: resourceDataWithoutId.url,
+                    filename: resourceDataWithoutId.filename,
+                    originalName: resourceDataWithoutId.originalName,
+                    filePath: resourceDataWithoutId.filePath,
+                    type: resourceDataWithoutId.type,
+                    duration: resourceDataWithoutId.duration,
+                    estimatedReadingTime: resourceDataWithoutId.estimatedReadingTime,
                     moduleId: newModule.id
                   }
                 });
@@ -1662,15 +1669,16 @@ module.exports = {
               } else {
                 console.warn(`Source file not found, skipping resource: ${sourceResource.originalName} (${sourceFilePath})`);
                 // Still create the resource record but with a note about missing file
+                const { id, ...resourceDataWithoutId } = sourceResource;
                 const newResource = await tx.resource.create({
                   data: {
-                    url: sourceResource.url,
-                    filename: sourceResource.filename,
-                    originalName: sourceResource.originalName,
-                    filePath: sourceResource.filePath,
-                    type: sourceResource.type,
-                    duration: sourceResource.duration,
-                    estimatedReadingTime: sourceResource.estimatedReadingTime,
+                    url: resourceDataWithoutId.url,
+                    filename: resourceDataWithoutId.filename,
+                    originalName: resourceDataWithoutId.originalName,
+                    filePath: resourceDataWithoutId.filePath,
+                    type: resourceDataWithoutId.type,
+                    duration: resourceDataWithoutId.duration,
+                    estimatedReadingTime: resourceDataWithoutId.estimatedReadingTime,
                     moduleId: newModule.id
                   }
                 });

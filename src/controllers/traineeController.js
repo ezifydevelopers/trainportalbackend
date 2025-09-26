@@ -109,6 +109,8 @@ module.exports = {
           module: {
             include: {
               videos: true,
+              mcqs: true,
+              resources: true
             },
           },
         },
@@ -129,7 +131,12 @@ module.exports = {
           marksObtained: p.score || 0,
           pass: p.pass,
           timeSpentOnVideo: p.timeSpent || 0,
-          unlocked: isUnlocked
+          unlocked: isUnlocked,
+          mcqs: p.module.mcqs || [],
+          resources: p.module.resources || [],
+          videos: p.module.videos || [],
+          isResourceModule: p.module.isResourceModule || false,
+          order: p.module.order || 0
         };
       });
 
