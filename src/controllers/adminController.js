@@ -564,6 +564,287 @@ module.exports = {
       res.status(500).json({ message: 'Server error', details: err.message });
     }
   },
+
+  // Atomic module creation with video and MCQs
+  createModuleWithContent: async (req, res) => {
+    const sessionId = req.headers['x-session-id'] || `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Initialize progress tracking
+    if (!global.moduleCreationProgress) {
+      global.moduleCreationProgress = {};
+    }
+    
+    global.moduleCreationProgress[sessionId] = {
+      status: 'starting',
+      progress: 0,
+      message: 'Initializing module creation...',
+      data: null,
+      error: null
+    };
+
+    try {
+      const { companyId, name, isResourceModule, duration, mcqs } = req.body;
+      
+      // Update progress
+      global.moduleCreationProgress[sessionId] = {
+        status: 'validating',
+        progress: 10,
+        message: 'Validating input data...',
+        data: null,
+        error: null
+      };
+
+      // Validation
+      if (!companyId || !name) {
+        global.moduleCreationProgress[sessionId] = {
+          status: 'error',
+          progress: 0,
+          message: 'Validation failed',
+          data: null,
+          error: 'Company ID and module name are required'
+        };
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Company ID and module name are required' 
+        });
+      }
+
+      if (!req.file) {
+        global.moduleCreationProgress[sessionId] = {
+          status: 'error',
+          progress: 0,
+          message: 'Validation failed',
+          data: null,
+          error: 'Video file is required'
+        };
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Video file is required' 
+        });
+      }
+
+      if (!duration) {
+        global.moduleCreationProgress[sessionId] = {
+          status: 'error',
+          progress: 0,
+          message: 'Validation failed',
+          data: null,
+          error: 'Video duration is required'
+        };
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Video duration is required' 
+        });
+      }
+
+      // Validate duration
+      let videoDuration = Number(duration);
+      if (isNaN(videoDuration) || !isFinite(videoDuration) || videoDuration <= 0) {
+        global.moduleCreationProgress[sessionId] = {
+          status: 'error',
+          progress: 0,
+          message: 'Validation failed',
+          data: null,
+          error: 'Invalid video duration'
+        };
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Invalid video duration. Please provide a valid positive number.' 
+        });
+      }
+
+      // Update progress
+      global.moduleCreationProgress[sessionId] = {
+        status: 'validating',
+        progress: 20,
+        message: 'Validating MCQs...',
+        data: null,
+        error: null
+      };
+
+      // Validate MCQs if provided
+      let mcqData = [];
+      if (mcqs && Array.isArray(mcqs)) {
+        mcqData = mcqs.map(mcq => {
+          if (!mcq.question || !mcq.options || !Array.isArray(mcq.options) || !mcq.answer) {
+            throw new Error('Invalid MCQ data: question, options, and answer are required');
+          }
+          return {
+            question: String(mcq.question),
+            options: mcq.options.map(opt => String(opt)),
+            answer: String(mcq.answer),
+            explanation: mcq.explanation ? String(mcq.explanation) : null
+          };
+        });
+      }
+
+      // Update progress
+      global.moduleCreationProgress[sessionId] = {
+        status: 'validating',
+        progress: 30,
+        message: 'Checking company...',
+        data: null,
+        error: null
+      };
+
+      // Check if company exists
+      const company = await prisma.company.findUnique({
+        where: { id: Number(companyId) },
+        include: {
+          users: {
+            where: { role: 'TRAINEE' }
+          }
+        }
+      });
+      
+      if (!company) {
+        global.moduleCreationProgress[sessionId] = {
+          status: 'error',
+          progress: 0,
+          message: 'Company not found',
+          data: null,
+          error: 'Company not found'
+        };
+        return res.status(404).json({ 
+          success: false, 
+          message: 'Company not found' 
+        });
+      }
+
+      // Update progress
+      global.moduleCreationProgress[sessionId] = {
+        status: 'creating',
+        progress: 40,
+        message: 'Creating module...',
+        data: null,
+        error: null
+      };
+
+      // Create everything in a transaction
+      const result = await prisma.$transaction(async (tx) => {
+        // 1. Create module
+        const module = await tx.trainingModule.create({
+          data: {
+            name: String(name),
+            companyId: Number(companyId),
+            isResourceModule: Boolean(isResourceModule),
+          },
+        });
+
+        // Update progress
+        global.moduleCreationProgress[sessionId] = {
+          status: 'creating',
+          progress: 60,
+          message: 'Creating video...',
+          data: null,
+          error: null
+        };
+
+        // 2. Create video
+        const video = await tx.video.create({
+          data: {
+            url: `/uploads/${req.file.filename}`,
+            duration: videoDuration,
+            moduleId: module.id,
+          },
+        });
+
+        // Update progress
+        global.moduleCreationProgress[sessionId] = {
+          status: 'creating',
+          progress: 80,
+          message: 'Creating MCQs...',
+          data: null,
+          error: null
+        };
+
+        // 3. Create MCQs if provided
+        let createdMCQs = [];
+        if (mcqData.length > 0) {
+          const mcqDataWithModuleId = mcqData.map(mcq => ({
+            ...mcq,
+            moduleId: module.id
+          }));
+
+          await tx.mCQ.createMany({
+            data: mcqDataWithModuleId
+          });
+
+          // Fetch created MCQs
+          createdMCQs = await tx.mCQ.findMany({
+            where: { moduleId: module.id }
+          });
+        }
+
+        // Update progress
+        global.moduleCreationProgress[sessionId] = {
+          status: 'creating',
+          progress: 90,
+          message: 'Assigning to trainees...',
+          data: null,
+          error: null
+        };
+
+        // 4. Assign module to all trainees in the company
+        if (company.users.length > 0) {
+          const progressRecords = company.users.map(user => ({
+            userId: user.id,
+            moduleId: module.id,
+            completed: false,
+            score: null,
+            timeSpent: null,
+            pass: false,
+          }));
+
+          await tx.traineeProgress.createMany({
+            data: progressRecords,
+          });
+        }
+
+        return {
+          module,
+          video,
+          mcqs: createdMCQs,
+          traineesAssigned: company.users.length
+        };
+      });
+
+      // Update progress to completed
+      global.moduleCreationProgress[sessionId] = {
+        status: 'completed',
+        progress: 100,
+        message: 'Module created successfully!',
+        data: result,
+        error: null
+      };
+
+      res.status(201).json({
+        success: true,
+        message: 'Module created successfully with video and MCQs',
+        data: result,
+        sessionId: sessionId
+      });
+
+    } catch (err) {
+      console.error('Error in createModuleWithContent:', err);
+      
+      // Update progress to error
+      global.moduleCreationProgress[sessionId] = {
+        status: 'error',
+        progress: 0,
+        message: 'Failed to create module',
+        data: null,
+        error: err.message
+      };
+
+      res.status(500).json({ 
+        success: false, 
+        message: 'Failed to create module with content', 
+        details: err.message,
+        sessionId: sessionId
+      });
+    }
+  },
   updateModule: async (req, res) => {
     try {
       const { id } = req.params;
@@ -1489,6 +1770,36 @@ module.exports = {
       res.json({ success: true, message: 'Company unassigned from manager successfully' });
     } catch (error) {
       res.status(500).json({ success: false, message: 'Failed to unassign company from manager', error: error.message });
+    }
+  },
+
+  // Progress tracking for module creation
+  getModuleCreationProgress: async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      
+      // In a real implementation, you'd store this in Redis or database
+      // For now, we'll use a simple in-memory store
+      const progress = global.moduleCreationProgress || {};
+      const sessionProgress = progress[sessionId];
+      
+      if (!sessionProgress) {
+        return res.status(404).json({
+          success: false,
+          message: 'Session not found'
+        });
+      }
+      
+      res.json({
+        success: true,
+        data: sessionProgress
+      });
+    } catch (err) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to get progress',
+        details: err.message
+      });
     }
   },
 

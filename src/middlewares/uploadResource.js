@@ -1,10 +1,20 @@
 const multer = require('multer');
 const path = require('path');
 
+// Environment-based upload path
+const getUploadPath = () => {
+  if (process.env.NODE_ENV === 'production') {
+    return '/home/dev/uploads/resources/';
+  } else {
+    // Local development - relative to project root
+    return path.join(__dirname, '../../../uploads/resources/');
+  }
+};
+
 // Configure storage
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, '../../uploads/resources/');
+    cb(null, getUploadPath());
   },
   filename: (req, file, cb) => {
     // Generate unique filename with timestamp

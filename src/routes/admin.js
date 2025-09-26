@@ -33,6 +33,8 @@ router.post('/companies/duplicate-data', adminController.duplicateCompanyData);
 
 router.get('/modules', adminController.getAllModules);
 router.post('/companies/:id/modules', adminController.addModule);
+router.post('/modules/create-with-content', uploadVideo.single('video'), adminController.createModuleWithContent);
+router.get('/modules/progress/:sessionId', adminController.getModuleCreationProgress);
 router.put('/modules/reorder', adminController.reorderModules);
 router.put('/modules/:id', adminController.updateModule);
 router.delete('/modules/:id', adminController.deleteModule);
