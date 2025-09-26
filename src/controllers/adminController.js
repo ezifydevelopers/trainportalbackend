@@ -1576,16 +1576,17 @@ module.exports = {
 
         // Duplicate modules and their related data
         for (const sourceModule of sourceCompany.modules) {
-          // Create new module
-          const newModule = await tx.trainingModule.create({
-            data: {
-              name: sourceModule.name,
-              companyId: parseInt(targetCompanyId),
-              order: sourceModule.order,
-              isResourceModule: sourceModule.isResourceModule
-            }
-          });
-          duplicatedModules.push(newModule);
+          try {
+            // Create new module
+            const newModule = await tx.trainingModule.create({
+              data: {
+                name: sourceModule.name,
+                companyId: parseInt(targetCompanyId),
+                order: sourceModule.order,
+                isResourceModule: sourceModule.isResourceModule
+              }
+            });
+            duplicatedModules.push(newModule);
 
           // Duplicate videos
           for (const sourceVideo of sourceModule.videos) {
@@ -1602,20 +1603,31 @@ module.exports = {
         // Duplicate MCQs
         for (const sourceMCQ of sourceModule.mcqs) {
           try { 
+            // Ensure we only pass the required fields and exclude any id field
+            const mcqData = {
+              question: sourceMCQ.question,
+              options: sourceMCQ.options,
+              answer: sourceMCQ.answer,
+              explanation: sourceMCQ.explanation,
+              moduleId: newModule.id
+            };
+            
             const newMCQ = await tx.mCQ.create({
-              data: {
-                question: sourceMCQ.question,
-                options: sourceMCQ.options,
-                answer: sourceMCQ.answer,
-                explanation: sourceMCQ.explanation,
-                moduleId: newModule.id
-              }
+              data: mcqData
             });
             duplicatedMCQs.push(newMCQ);
             console.log(`Successfully duplicated MCQ: ${sourceMCQ.question}`);
           } catch (mcqError) {
             console.error(`Error duplicating MCQ: ${sourceMCQ.question}`, mcqError.message);
-            // Continue with other MCQs even if one fails
+            console.error(`MCQ data:`, JSON.stringify(sourceMCQ, null, 2));
+            console.error(`MCQ data being sent:`, JSON.stringify({
+              question: sourceMCQ.question,
+              options: sourceMCQ.options,
+              answer: sourceMCQ.answer,
+              explanation: sourceMCQ.explanation,
+              moduleId: newModule.id
+            }, null, 2));
+            throw mcqError; // Re-throw to abort the transaction
           }
         }
 
@@ -1680,6 +1692,10 @@ module.exports = {
               timeSpent: null,
               pass: false
             });
+          }
+          } catch (moduleError) {
+            console.error(`Error duplicating module ${sourceModule.name}:`, moduleError.message);
+            throw moduleError; // Re-throw to abort the transaction
           }
         }
 
