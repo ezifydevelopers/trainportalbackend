@@ -74,6 +74,7 @@ const getOrCreateDirectChat = async (req, res) => {
 
     // If no chat room exists, create one
     if (!chatRoom) {
+
       // For cross-company chats, use the current user's company as primary
       // or find a valid company ID if current user has no company
       let chatRoomCompanyId = currentUser.companyId;
@@ -132,6 +133,7 @@ const getOrCreateDirectChat = async (req, res) => {
           messages: []
         }
       });
+
     }
 
     // Mark messages as read for the current user
@@ -210,6 +212,7 @@ const getChatRoomMessages = async (req, res) => {
     const { chatRoomId } = req.params;
     const currentUserId = req.user.id;
 
+
     // Verify user is a participant in this chat room
     const participant = await prisma.chatRoomParticipant.findFirst({
       where: {
@@ -257,6 +260,18 @@ const getChatRoomMessages = async (req, res) => {
             name: true,
             role: true
           }
+        },
+        replyToMessage: {
+          select: {
+            id: true,
+            content: true,
+            sender: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          }
         }
       },
       orderBy: {
@@ -284,7 +299,7 @@ const getChatRoomMessages = async (req, res) => {
 // Send a message
 const sendMessage = async (req, res) => {
   try {
-    const { chatRoomId, content, receiverId } = req.body;
+    const { chatRoomId, content, receiverId, replyToMessageId } = req.body;
     const currentUserId = req.user.id;
 
     // Verify user is a participant in this chat room
@@ -328,7 +343,8 @@ const sendMessage = async (req, res) => {
         content,
         senderId: currentUserId,
         receiverId: receiverId ? parseInt(receiverId) : null,
-        chatRoomId: parseInt(chatRoomId)
+        chatRoomId: parseInt(chatRoomId),
+        replyToMessageId: replyToMessageId ? parseInt(replyToMessageId) : null
       },
       include: {
         sender: {
@@ -336,6 +352,18 @@ const sendMessage = async (req, res) => {
             id: true,
             name: true,
             role: true
+          }
+        },
+        replyToMessage: {
+          select: {
+            id: true,
+            content: true,
+            sender: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
           }
         }
       }
@@ -595,6 +623,177 @@ const markAllMessagesAsRead = async (req, res) => {
   }
 };
 
+// Delete a single message
+const deleteMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const currentUserId = req.user?.id;
+
+    if (!currentUserId) {
+      return res.status(401).json({ message: 'User not authenticated' });
+    }
+
+    // Check if message exists and user has permission to delete it
+    const message = await prisma.chatMessage.findUnique({
+      where: { id: parseInt(messageId) },
+      include: {
+        chatRoom: {
+          include: {
+            participants: {
+              where: { userId: currentUserId }
+            }
+          }
+        }
+      }
+    });
+
+    if (!message) {
+      return res.status(404).json({ message: 'Message not found' });
+    }
+
+    // Check if user is participant in the chat room
+    if (message.chatRoom.participants.length === 0) {
+      return res.status(403).json({ message: 'Access denied to this chat room' });
+    }
+
+    // Allow any participant to delete messages (like WhatsApp)
+    // Only check if user is participant in the chat room
+
+    // Delete the message
+    await prisma.chatMessage.delete({
+      where: { id: parseInt(messageId) }
+    });
+
+    res.json({ success: true, message: 'Message deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting message:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Delete multiple messages
+const deleteMultipleMessages = async (req, res) => {
+  try {
+    const { messageIds } = req.body;
+    const currentUserId = req.user?.id;
+
+    if (!currentUserId) {
+      return res.status(401).json({ message: 'User not authenticated' });
+    }
+
+    if (!messageIds || !Array.isArray(messageIds) || messageIds.length === 0) {
+      return res.status(400).json({ message: 'Message IDs are required' });
+    }
+
+    // Check if all messages exist and user has permission to delete them
+    const messages = await prisma.chatMessage.findMany({
+      where: { 
+        id: { in: messageIds.map(id => parseInt(id)) }
+      },
+      include: {
+        chatRoom: {
+          include: {
+            participants: {
+              where: { userId: currentUserId }
+            }
+          }
+        }
+      }
+    });
+
+    if (messages.length !== messageIds.length) {
+      return res.status(404).json({ message: 'Some messages not found' });
+    }
+
+    // Check permissions for each message
+    for (const message of messages) {
+      if (message.chatRoom.participants.length === 0) {
+        return res.status(403).json({ message: 'Access denied to some chat rooms' });
+      }
+      
+      // Allow any participant to delete messages (like WhatsApp)
+      // Only check if user is participant in the chat room
+    }
+
+    // Delete all messages
+    await prisma.chatMessage.deleteMany({
+      where: { id: { in: messageIds.map(id => parseInt(id)) } }
+    });
+
+    res.json({ success: true, message: `${messageIds.length} messages deleted successfully` });
+  } catch (error) {
+    console.error('Error deleting multiple messages:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Delete entire chat room
+const deleteChatRoom = async (req, res) => {
+  try {
+    const { chatRoomId } = req.params;
+    const currentUserId = req.user?.id;
+
+    if (!currentUserId) {
+      return res.status(401).json({ message: 'User not authenticated' });
+    }
+
+    // Check if chat room exists and user has permission to delete it
+    const chatRoom = await prisma.chatRoom.findUnique({
+      where: { id: parseInt(chatRoomId) },
+      include: {
+        participants: {
+          where: { userId: currentUserId }
+        }
+      }
+    });
+
+    if (!chatRoom) {
+      return res.status(404).json({ message: 'Chat room not found' });
+    }
+
+    // Check if user is participant in the chat room
+    if (chatRoom.participants.length === 0) {
+      return res.status(403).json({ message: 'Access denied to this chat room' });
+    }
+
+    // Only allow admins to delete entire chat rooms, or users to leave the chat
+    if (req.user.role !== 'ADMIN') {
+      // For non-admin users, just remove them from the chat room
+      await prisma.chatRoomParticipant.deleteMany({
+        where: {
+          chatRoomId: parseInt(chatRoomId),
+          userId: currentUserId
+        }
+      });
+
+      return res.json({ success: true, message: 'You have left the chat room' });
+    }
+
+    // For admins, delete the entire chat room and all related data
+    await prisma.$transaction(async (tx) => {
+      // Delete all messages in the chat room
+      await tx.chatMessage.deleteMany({
+        where: { chatRoomId: parseInt(chatRoomId) }
+      });
+
+      // Delete all participants
+      await tx.chatRoomParticipant.deleteMany({
+        where: { chatRoomId: parseInt(chatRoomId) }
+      });
+
+      // Delete the chat room
+      await tx.chatRoom.delete({
+        where: { id: parseInt(chatRoomId) }
+      });
+    });
+
+    res.json({ success: true, message: 'Chat room deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting chat room:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
 module.exports = {
   getOrCreateDirectChat,
   getUserChatRooms,
@@ -604,5 +803,8 @@ module.exports = {
   getUnreadMessageCount,
   getRecentMessages,
   markMessageAsRead,
-  markAllMessagesAsRead
+  markAllMessagesAsRead,
+  deleteMessage,
+  deleteMultipleMessages,
+  deleteChatRoom
 };

@@ -7,7 +7,7 @@ const getUploadPath = () => {
     return '/home/dev/uploads/';
   } else {
     // Local development - relative to project root
-    return path.join(__dirname, '../../../uploads/');
+    return path.join(__dirname, '../../uploads/');
   }
 };
 

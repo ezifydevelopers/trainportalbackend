@@ -166,18 +166,21 @@ model ChatRoomParticipant {
 }
 
 model ChatMessage {
-  id          Int         @id @default(autoincrement())
-  content     String
-  senderId    Int
-  receiverId  Int?
-  chatRoomId  Int
-  messageType MessageType @default(TEXT)
-  isRead      Boolean     @default(false)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  chatRoom    ChatRoom    @relation(fields: [chatRoomId], references: [id])
-  receiver    User?       @relation("MessageReceiver", fields: [receiverId], references: [id])
-  sender      User        @relation("MessageSender", fields: [senderId], references: [id])
+  id               Int          @id @default(autoincrement())
+  content          String
+  senderId         Int
+  receiverId       Int?
+  chatRoomId       Int
+  replyToMessageId Int?
+  messageType      MessageType  @default(TEXT)
+  isRead           Boolean      @default(false)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  chatRoom         ChatRoom     @relation(fields: [chatRoomId], references: [id])
+  receiver         User?        @relation("MessageReceiver", fields: [receiverId], references: [id])
+  sender           User         @relation("MessageSender", fields: [senderId], references: [id])
+  replyToMessage   ChatMessage? @relation("MessageReply", fields: [replyToMessageId], references: [id])
+  replies          ChatMessage[] @relation("MessageReply")
 }
 
 model Resource {

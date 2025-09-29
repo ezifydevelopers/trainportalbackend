@@ -3,6 +3,15 @@ const router = express.Router();
 const chatController = require('../controllers/chatController');
 const authMiddleware = require('../middlewares/authMiddleware');
 
+// Test endpoint to verify authentication
+router.get('/test-auth', authMiddleware, (req, res) => {
+  res.json({ 
+    success: true, 
+    message: 'Authentication working!', 
+    user: req.user 
+  });
+});
+
 // Apply authentication middleware to all chat routes
 router.use(authMiddleware);
 
@@ -32,5 +41,10 @@ router.post('/mark-read', chatController.markMessageAsRead);
 
 // Mark all messages as read
 router.post('/mark-all-read', chatController.markAllMessagesAsRead);
+
+// Delete operations
+router.delete('/messages/:messageId', chatController.deleteMessage);
+router.post('/messages/delete-multiple', chatController.deleteMultipleMessages);
+router.delete('/rooms/:chatRoomId', chatController.deleteChatRoom);
 
 module.exports = router;
