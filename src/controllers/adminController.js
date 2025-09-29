@@ -533,11 +533,21 @@ module.exports = {
       if (!company) {
         return res.status(404).json({ message: 'Company not found' });
       }
+      // Get the next order number for this company
+      const lastModule = await prisma.trainingModule.findFirst({
+        where: { companyId: Number(id) },
+        orderBy: { order: 'desc' },
+        select: { order: true }
+      });
+      
+      const nextOrder = (lastModule?.order || 0) + 1;
+      
       const module = await prisma.trainingModule.create({
         data: {
           name,
           companyId: Number(id),
           isResourceModule: Boolean(isResourceModule),
+          order: nextOrder,
         },
       });
       // Automatically assign all trainees in this company to the new module
@@ -722,12 +732,22 @@ module.exports = {
 
       // Create everything in a transaction
       const result = await prisma.$transaction(async (tx) => {
-        // 1. Create module
+        // 1. Create module with proper order
+        // Get the next order number for this company
+        const lastModule = await tx.trainingModule.findFirst({
+          where: { companyId: Number(companyId) },
+          orderBy: { order: 'desc' },
+          select: { order: true }
+        });
+        
+        const nextOrder = (lastModule?.order || 0) + 1;
+        
         const module = await tx.trainingModule.create({
           data: {
             name: String(name),
             companyId: Number(companyId),
             isResourceModule: Boolean(isResourceModule),
+            order: nextOrder,
           },
         });
 
@@ -1473,6 +1493,26 @@ module.exports = {
       
       if (modules.length !== moduleIds.length) {
         return res.status(400).json({ success: false, message: 'Some modules were not found for the specified company' });
+      }
+
+      // Validate that order numbers are sequential and unique
+      const sortedOrders = sanitizedOrders.sort((a, b) => a.order - b.order);
+      for (let i = 0; i < sortedOrders.length; i++) {
+        if (sortedOrders[i].order !== i + 1) {
+          return res.status(400).json({ 
+            success: false, 
+            message: `Order numbers must be sequential starting from 1. Found order ${sortedOrders[i].order} at position ${i + 1}` 
+          });
+        }
+      }
+      
+      // Check for duplicate order numbers
+      const orderSet = new Set(sanitizedOrders.map(m => m.order));
+      if (orderSet.size !== sanitizedOrders.length) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Order numbers must be unique' 
+        });
       }
 
       // Update inside a transaction

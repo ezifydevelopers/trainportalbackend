@@ -37,9 +37,13 @@ module.exports = {
       let currentModule = null;
       for (let i = 0; i < progressRecords.length; i++) {
         // Always unlock resource modules, otherwise use sequential logic
-        // For video modules: unlock if previous module is completed (regardless of pass status)
+        // For video modules: unlock if previous module is completed
+        
+        // Find the previous module in the sequence (not just array index)
+        const previousModule = i > 0 ? progressRecords[i - 1] : null;
+        
         const isUnlocked = progressRecords[i].module.isResourceModule || 
-          (i === 0 || (i > 0 && progressRecords[i - 1].completed));
+          (i === 0 || (previousModule && previousModule.completed));
         
         if (isUnlocked && !progressRecords[i].completed) {
           currentModule = {
@@ -54,18 +58,26 @@ module.exports = {
       // Create module progress array with unlock status
       const moduleProgress = progressRecords.map((p, index) => {
         // Always unlock resource modules, otherwise use sequential logic
-        // For video modules: unlock if previous module is completed (regardless of pass status)
+        // For video modules: unlock if previous module is completed
         // For resource modules: always unlocked
+        
+        // Find the previous module in the sequence (not just array index)
+        const previousModule = index > 0 ? progressRecords[index - 1] : null;
+        
         const isUnlocked = p.module.isResourceModule || 
-          (index === 0 || (index > 0 && progressRecords[index - 1].completed));
+          (index === 0 || (previousModule && previousModule.completed));
 
         console.log(`Module ${index + 1} (${p.module.name}):`, {
           id: p.module.id,
+          order: p.module.order,
           completed: p.completed,
           pass: p.pass,
           unlocked: isUnlocked,
-          previousModuleCompleted: index > 0 ? progressRecords[index - 1].completed : 'N/A',
-          previousModulePass: index > 0 ? progressRecords[index - 1].pass : 'N/A'
+          previousModuleCompleted: previousModule ? previousModule.completed : 'N/A',
+          previousModulePass: previousModule ? previousModule.pass : 'N/A',
+          previousModuleName: previousModule ? previousModule.module.name : 'N/A',
+          previousModuleOrder: previousModule ? previousModule.module.order : 'N/A',
+          unlockConditionMet: index === 0 || (previousModule && previousModule.completed)
         });
 
         return {
@@ -122,9 +134,26 @@ module.exports = {
 
       const modules = progressRecords.map((p, index) => {
         // First module is always unlocked
-        // Subsequent modules are unlocked if the previous module is completed (regardless of pass status)
+        // Subsequent modules are unlocked if the previous module is completed
+        
+        // Find the previous module in the sequence (not just array index)
+        const previousModule = index > 0 ? progressRecords[index - 1] : null;
+        
         const isUnlocked = index === 0 || 
-          (index > 0 && progressRecords[index - 1].completed);
+          (previousModule && previousModule.completed);
+
+        console.log(`listModules - Module ${index + 1} (${p.module.name}):`, {
+          id: p.module.id,
+          order: p.module.order,
+          completed: p.completed,
+          pass: p.pass,
+          unlocked: isUnlocked,
+          previousModuleCompleted: previousModule ? previousModule.completed : 'N/A',
+          previousModulePass: previousModule ? previousModule.pass : 'N/A',
+          previousModuleName: previousModule ? previousModule.module.name : 'N/A',
+          previousModuleOrder: previousModule ? previousModule.module.order : 'N/A',
+          unlockConditionMet: index === 0 || (previousModule && previousModule.completed)
+        });
 
         return {
           moduleId: p.module.id,
@@ -186,6 +215,8 @@ module.exports = {
       const { id } = req.params;
       const userId = req.user.id;
 
+      console.log(`🎬 completeModule called - Module ID: ${id}, User ID: ${userId}`);
+
       // Get the module to check if it has MCQs
       const module = await prisma.trainingModule.findUnique({
         where: { id: Number(id) },
@@ -195,14 +226,18 @@ module.exports = {
       });
 
       if (!module) {
+        console.log('❌ Module not found');
         return res.status(404).json({ message: 'Module not found' });
       }
+
+      console.log(`📚 Module: ${module.name}, MCQs: ${module.mcqs?.length || 0}`);
 
       // If module has no MCQs, mark as completed and passed
       // If module has MCQs, don't mark as completed (user needs to take quiz)
       const hasMCQs = module.mcqs && module.mcqs.length > 0;
       
       if (hasMCQs) {
+        console.log('📝 Module has MCQs, marking as completed but not passed');
         // Module has MCQs - mark as completed but not passed, user needs to take quiz
         const updateData = {
           completed: true,
@@ -216,6 +251,7 @@ module.exports = {
           data: updateData,
         });
 
+        console.log('✅ Module marked as completed (with MCQs)');
         res.json({ 
           message: 'Module video completed. Please take the quiz to proceed.',
           hasMCQs: true,
@@ -224,6 +260,7 @@ module.exports = {
         return;
       }
       
+      console.log('✅ Module has no MCQs, marking as completed and auto-passing');
       // Module has no MCQs - mark as completed and auto-pass
       const updateData = {
         completed: true,
@@ -237,16 +274,19 @@ module.exports = {
         data: updateData,
       });
 
+      console.log(`✅ Updated ${progress.count} progress records`);
+
       // Check if user has completed all modules and generate certificate
       await checkAndGenerateCertificate(userId, module.companyId);
 
+      console.log('✅ Module completed successfully');
       res.json({ 
         message: 'Module completed successfully! You can now access the next module.',
         hasMCQs: false,
         autoPassed: true
       });
     } catch (err) {
-
+      console.error('❌ Error in completeModule:', err);
       res.status(500).json({ message: 'Server error' });
     }
   },
