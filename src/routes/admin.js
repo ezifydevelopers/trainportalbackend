@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
+const enhancedAdminController = require('../controllers/enhancedAdminController');
 const uploadLogo = require('../middlewares/uploadLogo');
 const uploadVideo = require('../middlewares/uploadVideo');
 const uploadResource = require('../middlewares/uploadResource');
@@ -84,5 +85,9 @@ router.get('/certificates/company/:companyId', adminController.getCertificatesBy
 router.get('/certificates/:certificateId', adminController.getCertificateById);
 router.get('/certificates/:certificateId/download', adminController.downloadCertificate);
 router.put('/certificates/:certificateId/revoke', adminController.revokeCertificate);
+
+// Enhanced module creation routes
+router.post('/modules/create-with-content', uploadVideo.single('video'), enhancedAdminController.createModuleWithSequentialUpload);
+router.get('/modules/progress/:sessionId', enhancedAdminController.getModuleCreationProgress);
 
 module.exports = router;
