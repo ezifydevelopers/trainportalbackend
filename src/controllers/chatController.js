@@ -36,10 +36,8 @@ const getOrCreateDirectChat = async (req, res) => {
       where: {
         type: 'DIRECT',
         participants: {
-          every: {
-            userId: {
-              in: [currentUserId, parseInt(participantId)]
-            }
+          some: {
+            userId: currentUserId
           }
         }
       },
@@ -71,6 +69,56 @@ const getOrCreateDirectChat = async (req, res) => {
         }
       }
     });
+
+    // Check if the found chat room has both users
+    if (chatRoom) {
+      const participantIds = chatRoom.participants.map(p => p.userId);
+      const hasBothUsers = participantIds.includes(currentUserId) && participantIds.includes(parseInt(participantId));
+      
+      if (!hasBothUsers) {
+        // Add the missing participant
+        await prisma.chatRoomParticipant.create({
+          data: {
+            userId: parseInt(participantId),
+            chatRoomId: chatRoom.id,
+            joinedAt: new Date(),
+            isActive: true
+          }
+        });
+        
+        // Refresh the chat room data
+        chatRoom = await prisma.chatRoom.findUnique({
+          where: { id: chatRoom.id },
+          include: {
+            participants: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    role: true
+                  }
+                }
+              }
+            },
+            messages: {
+              orderBy: { createdAt: 'desc' },
+              take: 50,
+              include: {
+                sender: {
+                  select: {
+                    id: true,
+                    name: true,
+                    role: true
+                  }
+                }
+              }
+            }
+          }
+        });
+      }
+    }
 
     // If no chat room exists, create one
     if (!chatRoom) {

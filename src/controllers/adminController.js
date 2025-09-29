@@ -249,27 +249,122 @@ module.exports = {
   deleteTrainee: async (req, res) => {
     try {
       const { id } = req.params;
-      const user = await prisma.user.findUnique({ where: { id: Number(id) } });
+      const userId = Number(id);
+      
+      const user = await prisma.user.findUnique({ where: { id: userId } });
       if (!user || user.role !== 'TRAINEE') {
         return res.status(404).json({ message: 'Trainee not found' });
       }
-      // Delete related records first to avoid foreign key constraint violations
+
+      // Delete all related records first to avoid foreign key constraint violations
       await prisma.$transaction(async (tx) => {
-        // Delete MCQ answers for this user (if any exist)
-        const deletedAnswers = await tx.mCQAnswer.deleteMany({
-          where: { userId: Number(id) }
-        });
-        // Delete trainee progress records for this user (if any exist)
-        const deletedProgress = await tx.traineeProgress.deleteMany({
-          where: { userId: Number(id) }
-        });
-        // Finally delete the user
-        await tx.user.delete({ where: { id: Number(id) } });
+        try {
+          // Delete MCQ answers for this user
+          await tx.mCQAnswer.deleteMany({
+            where: { userId: userId }
+          });
+        } catch (error) {
+          console.log('Error deleting MCQ answers:', error.message);
+        }
+
+        try {
+          // Delete trainee progress records for this user
+          await tx.traineeProgress.deleteMany({
+            where: { userId: userId }
+          });
+        } catch (error) {
+          console.log('Error deleting trainee progress:', error.message);
+        }
+
+        try {
+          // Delete help requests for this user
+          await tx.helpRequest.deleteMany({
+            where: { traineeId: userId }
+          });
+        } catch (error) {
+          console.log('Error deleting help requests:', error.message);
+        }
+
+        try {
+          // Delete feedback from this user
+          await tx.feedback.deleteMany({
+            where: { userId: userId }
+          });
+        } catch (error) {
+          console.log('Error deleting feedback:', error.message);
+        }
+
+        try {
+          // Delete notifications for this user
+          await tx.notification.deleteMany({
+            where: { userId: userId }
+          });
+        } catch (error) {
+          console.log('Error deleting notifications:', error.message);
+        }
+
+        try {
+          // Delete chat room participants for this user
+          await tx.chatRoomParticipant.deleteMany({
+            where: { userId: userId }
+          });
+        } catch (error) {
+          console.log('Error deleting chat room participants:', error.message);
+        }
+
+        try {
+          // Delete sent messages
+          await tx.chatMessage.deleteMany({
+            where: { senderId: userId }
+          });
+        } catch (error) {
+          console.log('Error deleting sent messages:', error.message);
+        }
+
+        try {
+          // Delete received messages
+          await tx.chatMessage.deleteMany({
+            where: { receiverId: userId }
+          });
+        } catch (error) {
+          console.log('Error deleting received messages:', error.message);
+        }
+
+        try {
+          // Delete resource time tracking for this user
+          await tx.resourceTimeTracking.deleteMany({
+            where: { userId: userId }
+          });
+        } catch (error) {
+          console.log('Error deleting resource time tracking:', error.message);
+        }
+
+        try {
+          // Delete certificates for this user
+          await tx.certificate.deleteMany({
+            where: { userId: userId }
+          });
+        } catch (error) {
+          console.log('Error deleting certificates:', error.message);
+        }
+
+        try {
+          // Finally delete the user
+          await tx.user.delete({ where: { id: userId } });
+        } catch (error) {
+          console.log('Error deleting user:', error.message);
+          throw error;
+        }
       });
 
       res.json({ message: 'Trainee deleted successfully' });
     } catch (err) {
-      res.status(500).json({ message: 'Server error', details: err.message });
+      console.error('Error in deleteTrainee:', err);
+      res.status(500).json({ 
+        message: 'Server error', 
+        details: err.message,
+        error: process.env.NODE_ENV === 'development' ? err.stack : undefined
+      });
     }
   },
   getCompanies: async (req, res) => {
