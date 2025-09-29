@@ -4,7 +4,7 @@ const WebSocketHandler = require('./websocketHandler');
 const ModuleCompletionService = require('./services/moduleCompletionService');
 const prisma = require('./prismaClient');
 
-const PORT = process.env.PORT || 7001;
+const PORT = process.env.PORT || (process.env.NODE_ENV === 'production' ? 80 : 7001);
 
 // Create HTTP server
 const server = http.createServer(app);
