@@ -14,7 +14,7 @@ const config = {
   development: {
     uploadsRoot: path.join(PROJECT_ROOT, 'uploads'),
     resourcesPath: path.join(PROJECT_ROOT, 'uploads', 'resources'),
-    videosPath: path.join(PROJECT_ROOT, 'uploads', 'videos'),
+    videosPath: path.join(PROJECT_ROOT, 'uploads'), // Videos go directly in uploads
     certificatesPath: path.join(PROJECT_ROOT, 'uploads', 'certificates'),
     logosPath: path.join(PROJECT_ROOT, 'uploads'), // Logos go directly in uploads
     staticUrl: '/uploads'
@@ -22,7 +22,7 @@ const config = {
   production: {
     uploadsRoot: '/home/dev/apps/uploads',
     resourcesPath: '/home/dev/apps/uploads/resources',
-    videosPath: '/home/dev/apps/uploads/videos', 
+    videosPath: '/home/dev/apps/uploads', // Videos go directly in uploads
     certificatesPath: '/home/dev/apps/uploads/certificates',
     logosPath: '/home/dev/apps/uploads', // Logos go directly in uploads
     staticUrl: '/uploads'
@@ -76,7 +76,7 @@ function getFilePath(fileType, filename) {
  * Get the URL path for a given file type and filename
  */
 function getFileUrl(fileType, filename) {
-  if (fileType === 'logo') {
+  if (fileType === 'logo' || fileType === 'video') {
     return `${currentConfig.staticUrl}/${filename}`;
   }
   return `${currentConfig.staticUrl}/${fileType}s/${filename}`;

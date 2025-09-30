@@ -41,13 +41,7 @@ app.use('/uploads/resources', (req, res, next) => {
   next();
 }, express.static(pathConfig.resourcesPath));
 
-// Serve videos
-app.use('/uploads/videos', (req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  next();
-}, express.static(pathConfig.videosPath));
+// Videos are served from the main uploads directory (no separate route needed)
 
 // Serve certificates
 app.use('/uploads/certificates', (req, res, next) => {
