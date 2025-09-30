@@ -20,11 +20,11 @@ const config = {
     staticUrl: '/uploads'
   },
   production: {
-    uploadsRoot: '/home/dev/uploads',
-    resourcesPath: '/home/dev/uploads/resources',
-    videosPath: '/home/dev/uploads/videos', 
-    certificatesPath: '/home/dev/uploads/certificates',
-    logosPath: '/home/dev/uploads', // Logos go directly in uploads
+    uploadsRoot: '/home/dev/apps/uploads',
+    resourcesPath: '/home/dev/apps/uploads/resources',
+    videosPath: '/home/dev/apps/uploads/videos', 
+    certificatesPath: '/home/dev/apps/uploads/certificates',
+    logosPath: '/home/dev/apps/uploads', // Logos go directly in uploads
     staticUrl: '/uploads'
   }
 };
