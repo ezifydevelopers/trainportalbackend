@@ -92,7 +92,7 @@ class CertificateService {
     return new Promise((resolve, reject) => {
       try {
         // Create uploads/certificates directory if it doesn't exist
-        const certDir = path.join(__dirname, '../../uploads/certificates');
+        const certDir = path.join(__dirname, '../../../uploads/certificates');
         if (!fs.existsSync(certDir)) {
           fs.mkdirSync(certDir, { recursive: true });
         }

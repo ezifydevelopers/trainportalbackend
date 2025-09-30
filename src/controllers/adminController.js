@@ -1070,9 +1070,17 @@ module.exports = {
           moduleId: Number(id),
         },
       });
-      res.status(201).json(video);
+      res.status(201).json({ 
+        success: true, 
+        message: 'Video uploaded successfully',
+        video: video
+      });
     } catch (err) {
-      res.status(500).json({ message: 'Server error', details: err.message });
+      res.status(500).json({ 
+        success: false, 
+        message: 'Failed to upload video', 
+        error: err.message 
+      });
     }
   },
   addMCQs: async (req, res) => {
@@ -1709,7 +1717,7 @@ module.exports = {
 
       // TODO: Delete physical file from uploads folder
       // const fs = require('fs');
-      // const filePath = path.join(__dirname, '../uploads/resources', resource.filePath);
+      // const filePath = path.join(__dirname, '../../../uploads/resources', resource.filePath);
       // if (fs.existsSync(filePath)) {
       //   fs.unlinkSync(filePath);
       // }
