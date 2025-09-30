@@ -2,7 +2,7 @@ const dotenv = require('dotenv');
 dotenv.config();
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
+const pathConfig = require('./config/paths');
 const mainRouter = require('./routes/index');
 const app = express();
 
@@ -10,43 +10,64 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Environment-based static file serving
-const getStaticPath = () => {
-  if (process.env.NODE_ENV === 'production') {
-    return '/home/dev/uploads';
-  } else {
-    return path.join(__dirname, '../../../uploads');
-  }
-};
+// Ensure all upload directories exist
+pathConfig.ensureDirectoriesExist();
 
 // Serve static files with CORS headers
 app.use('/uploads', (req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
   res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  
+  // Set proper content type for images (logos)
+  if (req.path.endsWith('.png')) {
+    res.type('image/png');
+  } else if (req.path.endsWith('.jpg') || req.path.endsWith('.jpeg')) {
+    res.type('image/jpeg');
+  } else if (req.path.endsWith('.gif')) {
+    res.type('image/gif');
+  } else if (req.path.endsWith('.webp')) {
+    res.type('image/webp');
+  }
+  
   next();
-}, express.static(getStaticPath()));
+}, express.static(pathConfig.uploadsRoot));
 
-// Debug: Log the resources path
-const resourcesPath = path.join(getStaticPath(), 'resources');
-console.log('Resources static path:', resourcesPath);
-
+// Serve resources
 app.use('/uploads/resources', (req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
   res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
   next();
-}, express.static(resourcesPath));
+}, express.static(pathConfig.resourcesPath));
 
-// Test endpoint to verify static file serving we can remove this later
+// Serve videos
+app.use('/uploads/videos', (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  next();
+}, express.static(pathConfig.videosPath));
+
+// Serve certificates
+app.use('/uploads/certificates', (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  next();
+}, express.static(pathConfig.certificatesPath));
+
+// Logos are served from the main uploads directory (no separate route needed)
+
+// Test endpoint to verify static file serving
 app.get('/test-uploads', (req, res) => {
   const fs = require('fs');
-  const uploadsPath = getStaticPath();
   try {
-    const files = fs.readdirSync(uploadsPath);
+    const files = fs.readdirSync(pathConfig.uploadsRoot);
     res.json({ 
       message: 'Uploads directory accessible',
-      files: files.filter(file => file.endsWith('.mp4')).slice(0, 5) // Show first 5 video files
+      path: pathConfig.uploadsRoot,
+      files: files.slice(0, 10)
     });
   } catch (error) {
     res.status(500).json({ error: 'Cannot access uploads directory', details: error.message });
@@ -57,16 +78,16 @@ app.get('/test-uploads', (req, res) => {
 app.get('/test-resources', (req, res) => {
   const fs = require('fs');
   try {
-    const files = fs.readdirSync(resourcesPath);
+    const files = fs.readdirSync(pathConfig.resourcesPath);
     res.json({ 
       message: 'Resources directory accessible',
-      path: resourcesPath,
-      files: files.slice(0, 10) // Show first 10 files
+      path: pathConfig.resourcesPath,
+      files: files.slice(0, 10)
     });
   } catch (error) {
     res.status(500).json({ 
       error: 'Cannot access resources directory',
-      path: resourcesPath,
+      path: pathConfig.resourcesPath,
       message: error.message 
     });
   }

@@ -1,29 +1,16 @@
 const multer = require('multer');
-const path = require('path');
-
-// Environment-based upload path
-const getUploadPath = () => {
-  if (process.env.NODE_ENV === 'production') {
-    return '/home/dev/uploads/';
-  } else {
-    // Local development - relative to project root
-    return path.join(__dirname, '../../../uploads/');
-  }
-};
+const pathConfig = require('../config/paths');
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const uploadPath = getUploadPath();
+    const uploadPath = pathConfig.videosPath;
     // Ensure directory exists
-    const fs = require('fs');
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-    }
+    pathConfig.ensureDirectoriesExist();
     cb(null, uploadPath);
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
+    cb(null, uniqueSuffix + require('path').extname(file.originalname));
   }
 });
 

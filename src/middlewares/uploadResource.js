@@ -1,32 +1,23 @@
 const multer = require('multer');
-const path = require('path');
-
-// Environment-based upload path
-const getUploadPath = () => {
-  if (process.env.NODE_ENV === 'production') {
-    return '/home/dev/uploads/resources/';
-  } else {
-    // Local development - relative to project root
-    return path.join(__dirname, '../../../uploads/resources/');
-  }
-};
+const pathConfig = require('../config/paths');
 
 // Configure storage
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadPath = getUploadPath();
+    const uploadPath = pathConfig.resourcesPath;
+    console.log('📁 Upload destination path:', uploadPath);
     // Ensure directory exists
-    const fs = require('fs');
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-    }
+    pathConfig.ensureDirectoriesExist();
+    console.log('📁 Directory exists:', pathConfig.fileExists('resource', 'test'));
     cb(null, uploadPath);
   },
   filename: (req, file, cb) => {
     // Generate unique filename with timestamp
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(file.originalname);
-    cb(null, file.fieldname + '-' + uniqueSuffix + ext);
+    const ext = require('path').extname(file.originalname);
+    const filename = file.fieldname + '-' + uniqueSuffix + ext;
+    console.log('📤 Generated filename:', filename);
+    cb(null, filename);
   }
 });
 
@@ -82,8 +73,10 @@ const upload = multer({
 
 // Middleware with error handling
 const uploadWithErrorHandling = (req, res, next) => {
+  console.log('📤 Upload middleware called');
   upload.single('resourceFile')(req, res, (err) => {
     if (err instanceof multer.MulterError) {
+      console.log('❌ Multer error:', err.message);
       if (err.code === 'LIMIT_FILE_SIZE') {
         return res.status(400).json({
           success: false,
@@ -95,11 +88,13 @@ const uploadWithErrorHandling = (req, res, next) => {
         message: `Upload error: ${err.message}`
       });
     } else if (err) {
+      console.log('❌ Upload error:', err.message);
       return res.status(400).json({
         success: false,
         message: err.message
       });
     }
+    console.log('✅ Upload middleware successful, file:', req.file ? req.file.filename : 'no file');
     next();
   });
 };

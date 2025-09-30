@@ -2,6 +2,7 @@ const prisma = require('../prismaClient');
 const path = require('path');
 const fs = require('fs');
 const bcrypt = require('bcrypt');
+const pathConfig = require('../config/paths');
 const NotificationService = require('../services/notificationService');
 const CertificateService = require('../services/certificateService');
 
@@ -382,7 +383,9 @@ module.exports = {
       const existing = await prisma.company.findUnique({ where: { name } });
       if (existing) return res.status(409).json({ message: 'Company already exists' });
       let logo = null;
-      if (req.file) logo = req.file.filename;
+      if (req.file) {
+        logo = pathConfig.getFileUrl('logo', req.file.filename);
+      }
       const company = await prisma.company.create({ data: { name, logo } });
       res.status(201).json(company);
     } catch (err) {
@@ -395,7 +398,7 @@ module.exports = {
       const { name } = req.body;
       let data = {};
       if (name) data.name = name;
-      if (req.file) data.logo = req.file.filename;
+      if (req.file) data.logo = pathConfig.getFileUrl('logo', req.file.filename);
       const company = await prisma.company.update({ where: { id: Number(id) }, data });
       res.json(company);
     } catch (err) {
@@ -1634,16 +1637,23 @@ module.exports = {
   // Resource management methods
   addResource: async (req, res) => {
     try {
+      console.log('📤 addResource called');
+      console.log('📤 req.file:', req.file ? req.file.filename : 'no file');
+      console.log('📤 req.body:', req.body);
+      
       if (!req.file) {
+        console.log('❌ No file uploaded');
         return res.status(400).json({ success: false, message: 'No file uploaded' });
       }
 
       const { moduleId, type, duration, estimatedReadingTime } = req.body;
 
       if (!moduleId || !type) {
+        console.log('❌ Missing moduleId or type');
         return res.status(400).json({ success: false, message: 'Module ID and type are required' });
       }
 
+      console.log('📤 Creating resource record...');
       // Create resource record
       const resource = await prisma.resource.create({
         data: {
@@ -1657,12 +1667,16 @@ module.exports = {
           moduleId: parseInt(moduleId)
         }
       });
+      
+      console.log('✅ Resource created successfully:', resource.id);
       return res.json({ 
         success: true, 
         message: 'Resource uploaded successfully',
         resource: resource
       });
     } catch (error) {
+      console.error('❌ Error adding resource:', error);
+      console.error('❌ Error details:', error.message);
       return res.status(500).json({ success: false, message: 'Failed to upload resource', error: error.message });
     }
   },
