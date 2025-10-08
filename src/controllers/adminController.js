@@ -47,7 +47,9 @@ module.exports = {
       const traineesWithProgress = trainees.map(trainee => {
         try {
           const progressRecords = trainee.progress || [];
-          const totalModules = progressRecords.length;
+          // Filter out resource modules from progress calculation
+          const trainingModules = progressRecords.filter(p => !p.module?.isResourceModule);
+          const totalModules = trainingModules.length;
           if (totalModules === 0) {
             return {
               ...trainee,
@@ -63,15 +65,15 @@ module.exports = {
             };
           }
 
-          const completedModules = progressRecords.filter(p => p.pass).length;
-          const modulesWithScores = progressRecords.filter(p => p.score !== null);
-          // Calculate average score across ALL modules (including those without scores as 0)
+          const completedModules = trainingModules.filter(p => p.pass).length;
+          const modulesWithScores = trainingModules.filter(p => p.score !== null);
+          // Calculate average score across training modules only (excluding resource modules)
           const averageScore = totalModules > 0 
-            ? progressRecords.reduce((sum, p) => sum + (p.score || 0), 0) / totalModules 
+            ? trainingModules.reduce((sum, p) => sum + (p.score || 0), 0) / totalModules 
             : 0;
           const totalTime = progressRecords.reduce((sum, p) => sum + (p.timeSpent || 0), 0);
           
-          // Calculate overall progress: each module is worth equal percentage
+          // Calculate overall progress: each training module is worth equal percentage
           const overallProgress = totalModules > 0 ? (completedModules / totalModules) * 100 : 0;
           return {
             ...trainee,
@@ -1193,26 +1195,29 @@ module.exports = {
         });
       }
 
-      const totalModules = progressRecords.length;
-      const completedModules = progressRecords.filter(p => p.pass).length; // Use 'pass' instead of 'completed'
-      const modulesWithScores = progressRecords.filter(p => p.score !== null);
-      // Calculate average score across ALL modules (including those without scores as 0)
+      // Filter out resource modules from progress calculation
+      const trainingModules = progressRecords.filter(p => !p.module?.isResourceModule);
+      const totalModules = trainingModules.length;
+      const completedModules = trainingModules.filter(p => p.pass).length; // Use 'pass' instead of 'completed'
+      const modulesWithScores = trainingModules.filter(p => p.score !== null);
+      // Calculate average score across training modules only (excluding resource modules)
       const averageScore = totalModules > 0 
-        ? progressRecords.reduce((sum, p) => sum + (p.score || 0), 0) / totalModules 
+        ? trainingModules.reduce((sum, p) => sum + (p.score || 0), 0) / totalModules 
         : 0;
       const totalTime = progressRecords.reduce((sum, p) => sum + (p.timeSpent || 0), 0);
       
-      // Calculate overall progress: each module is worth equal percentage
+      // Calculate overall progress: each training module is worth equal percentage
       const overallProgress = totalModules > 0 ? (completedModules / totalModules) * 100 : 0;
 
       const moduleProgress = progressRecords.map(p => ({
         moduleId: p.module.id,
         moduleName: p.module.name,
         score: p.score,
-                    videoDuration: p.module.videos ? p.module.videos?.[0]?.duration : null,
+        videoDuration: p.module.videos ? p.module.videos?.[0]?.duration : null,
         timeSpent: p.timeSpent || 0,
         pass: p.pass,
         completed: p.completed,
+        isResourceModule: p.module.isResourceModule || false,
         // Fix status calculation: if time spent > 0 but not passed, it's "In Progress"
         status: p.pass ? 'Completed' : (p.timeSpent > 0 ? 'In Progress' : 'Not Started')
       }));

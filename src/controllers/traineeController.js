@@ -26,24 +26,26 @@ module.exports = {
 
       });
 
-      const totalModules = progressRecords.length;
-      const completedModules = progressRecords.filter(p => p.pass).length;
+      // Filter out resource modules from progress calculation
+      const trainingModules = progressRecords.filter(p => !p.module.isResourceModule);
+      const totalModules = trainingModules.length;
+      const completedModules = trainingModules.filter(p => p.pass).length;
       const averageScore = totalModules > 0 
-        ? progressRecords.reduce((sum, p) => sum + (p.score || 0), 0) / totalModules 
+        ? trainingModules.reduce((sum, p) => sum + (p.score || 0), 0) / totalModules 
         : 0;
       const totalTime = progressRecords.reduce((sum, p) => sum + (p.timeSpent || 0), 0);
 
-      // Find current module (first incomplete module that is unlocked)
+      // Find current module (first incomplete training module that is unlocked)
       let currentModule = null;
       for (let i = 0; i < progressRecords.length; i++) {
-        // Always unlock resource modules, otherwise use sequential logic
+        // Skip resource modules for current module calculation
+        if (progressRecords[i].module.isResourceModule) {
+          continue;
+        }
+        
         // For video modules: unlock if previous module is completed
-        
-        // Find the previous module in the sequence (not just array index)
         const previousModule = i > 0 ? progressRecords[i - 1] : null;
-        
-        const isUnlocked = progressRecords[i].module.isResourceModule || 
-          (i === 0 || (previousModule && previousModule.completed));
+        const isUnlocked = i === 0 || (previousModule && previousModule.completed);
         
         if (isUnlocked && !progressRecords[i].completed) {
           currentModule = {
@@ -104,7 +106,7 @@ module.exports = {
         modulesCompleted: completedModules,
         averageScore: Math.round(averageScore),
         totalTimeSpent: totalTime,
-        totalModules,
+        totalModules, // This now only includes training modules (excludes resource modules)
         currentModule,
         moduleProgress,
         lastUpdated: new Date()
