@@ -9,11 +9,16 @@ const mainRouter = require('./routes/index');
 const videoStreaming = require('./middlewares/videoStreaming');
 const app = express();
 
-// Security and performance middleware
+// Security and performance middleware - optimized for video streaming
 app.use(helmet({
   contentSecurityPolicy: false, // Disable CSP for video streaming
   crossOriginEmbedderPolicy: false,
-  crossOriginResourcePolicy: { policy: "cross-origin" }
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  // Disable helmet for video routes to prevent header conflicts
+  hsts: false, // Disable HSTS for video streaming
+  noSniff: false, // Allow video content type detection
+  frameguard: false, // Allow video embedding
+  xssFilter: false, // Disable XSS filter for video content
 }));
 
 // Compression middleware for all responses
@@ -51,6 +56,11 @@ app.use('/uploads', (req, res, next) => {
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Range');
   res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
   
+  // Remove security headers that interfere with video streaming
+  res.removeHeader('X-Content-Type-Options');
+  res.removeHeader('X-Frame-Options');
+  res.removeHeader('X-XSS-Protection');
+  
   // Set proper content type for images (logos)
   if (req.path.endsWith('.png')) {
     res.type('image/png');
@@ -69,6 +79,10 @@ app.use('/uploads', (req, res, next) => {
     if (path.match(/\.(mp4|webm|ogg|avi|mov)$/i)) {
       res.setHeader('Accept-Ranges', 'bytes');
       res.setHeader('Content-Type', 'video/mp4');
+      // Remove conflicting headers for video files
+      res.removeHeader('X-Content-Type-Options');
+      res.removeHeader('X-Frame-Options');
+      res.removeHeader('X-XSS-Protection');
     }
   }
 }));
