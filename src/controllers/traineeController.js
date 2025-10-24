@@ -43,7 +43,7 @@ module.exports = {
           continue;
         }
         
-        // For video modules: unlock if previous module is completed
+        // For video modules: unlock if previous module is completed and not completed
         const previousModule = i > 0 ? progressRecords[i - 1] : null;
         const isUnlocked = i === 0 || (previousModule && previousModule.completed);
         
