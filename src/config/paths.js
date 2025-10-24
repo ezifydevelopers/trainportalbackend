@@ -6,17 +6,30 @@ const fs = require('fs');
  * This eliminates path inconsistencies and makes the codebase more maintainable
  */
 
-// Get the project root directory (3 levels up from this file: src/config/paths.js)
+// Get the project root directory - go up from trainportalbackend/src/config to project root
+// From: E:\Ezify\trainingportal\trainportalbackend\src\config\paths.js
+// To:   E:\Ezify\trainingportal\
 const PROJECT_ROOT = path.resolve(__dirname, '../../../');
+
+// Since the backend runs from trainportalbackend directory, go up one level to project root
+const ALTERNATIVE_ROOT = path.resolve(process.cwd(), '..');
+
+// Verify the uploads directory exists
+const uploadsPath = path.join(ALTERNATIVE_ROOT, 'uploads');
+if (fs.existsSync(uploadsPath)) {
+  console.log('✅ Uploads directory found:', uploadsPath);
+} else {
+  console.log('❌ Uploads directory NOT found:', uploadsPath);
+}
 
 // Environment-based configuration
 const config = {
   development: {
-    uploadsRoot: path.join(PROJECT_ROOT, 'uploads'),
-    resourcesPath: path.join(PROJECT_ROOT, 'uploads', 'resources'),
-    videosPath: path.join(PROJECT_ROOT, 'uploads'), // Videos go directly in uploads
-    certificatesPath: path.join(PROJECT_ROOT, 'uploads', 'certificates'),
-    logosPath: path.join(PROJECT_ROOT, 'uploads'), // Logos go directly in uploads
+    uploadsRoot: path.join(ALTERNATIVE_ROOT, 'uploads'),
+    resourcesPath: path.join(ALTERNATIVE_ROOT, 'uploads', 'resources'),
+    videosPath: path.join(ALTERNATIVE_ROOT, 'uploads'), // Videos go directly in uploads
+    certificatesPath: path.join(ALTERNATIVE_ROOT, 'uploads', 'certificates'),
+    logosPath: path.join(ALTERNATIVE_ROOT, 'uploads'), // Logos go directly in uploads
     staticUrl: '/uploads'
   },
   production: {

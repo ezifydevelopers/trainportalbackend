@@ -42,11 +42,14 @@ app.use(cors({
 }));
 
 // Increase body size limits for video uploads
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: '500mb' }));
+app.use(express.urlencoded({ extended: true, limit: '500mb' }));
 
 // Ensure all upload directories exist
 pathConfig.ensureDirectoriesExist();
+
+// Apply video streaming middleware for video files
+app.use('/uploads', videoStreaming);
 
 // Serve static files with optimized headers
 app.use('/uploads', (req, res, next) => {

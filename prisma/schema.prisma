@@ -58,11 +58,14 @@ model TrainingModule {
 }
 
 model Video {
-  id       Int            @id @default(autoincrement())
-  url      String
-  duration Int
-  moduleId Int
-  module   TrainingModule @relation(fields: [moduleId], references: [id])
+  id        Int            @id @default(autoincrement())
+  url       String
+  duration  Int
+  moduleId  Int
+  module    TrainingModule @relation(fields: [moduleId], references: [id])
+  title     String?        // For YouTube videos
+  thumbnail String?        // For YouTube videos
+  isYouTube Boolean        @default(false) // Flag to identify YouTube videos
 }
 
 model MCQ {

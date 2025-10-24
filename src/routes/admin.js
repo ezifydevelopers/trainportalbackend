@@ -5,6 +5,7 @@ const enhancedAdminController = require('../controllers/enhancedAdminController'
 const uploadLogo = require('../middlewares/uploadLogo');
 const uploadVideo = require('../middlewares/uploadVideo');
 const uploadResource = require('../middlewares/uploadResource');
+const conditionalUpload = require('../middlewares/conditionalUpload');
 const authMiddleware = require('../middlewares/authMiddleware');
 
 router.use(authMiddleware);
@@ -33,11 +34,12 @@ router.delete('/companies/:id', adminController.deleteCompany);
 router.post('/companies/duplicate-data', adminController.duplicateCompanyData);
 
 router.get('/modules', adminController.getAllModules);
+router.get('/modules/:id', adminController.getModule);
 router.post('/companies/:id/modules', adminController.addModule);
 router.post('/modules/create-with-content', uploadVideo.single('video'), adminController.createModuleWithContent);
 router.get('/modules/progress/:sessionId', adminController.getModuleCreationProgress);
 router.put('/modules/reorder', adminController.reorderModules);
-router.put('/modules/:id', adminController.updateModule);
+router.put('/modules/:id', conditionalUpload, adminController.updateModule);
 router.delete('/modules/:id', adminController.deleteModule);
 router.post('/modules/:id/video', uploadVideo.single('video'), adminController.addVideo);
 router.post('/modules/:id/mcqs', adminController.addMCQs);

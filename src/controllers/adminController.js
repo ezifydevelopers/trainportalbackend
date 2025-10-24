@@ -693,7 +693,7 @@ module.exports = {
     };
 
     try {
-      const { companyId, name, isResourceModule, duration, mcqs } = req.body;
+      const { companyId, name, isResourceModule, duration, mcqs, videoType, youtubeUrl, youtubeTitle, youtubeThumbnail } = req.body;
       
       // Update progress
       global.moduleCreationProgress[sessionId] = {
@@ -719,18 +719,35 @@ module.exports = {
         });
       }
 
-      if (!req.file) {
-        global.moduleCreationProgress[sessionId] = {
-          status: 'error',
-          progress: 0,
-          message: 'Validation failed',
-          data: null,
-          error: 'Video file is required'
-        };
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Video file is required' 
-        });
+      // Validate video input
+      if (videoType === 'youtube') {
+        if (!youtubeUrl) {
+          global.moduleCreationProgress[sessionId] = {
+            status: 'error',
+            progress: 0,
+            message: 'Validation failed',
+            data: null,
+            error: 'YouTube URL is required'
+          };
+          return res.status(400).json({ 
+            success: false, 
+            message: 'YouTube URL is required' 
+          });
+        }
+      } else {
+        if (!req.file) {
+          global.moduleCreationProgress[sessionId] = {
+            status: 'error',
+            progress: 0,
+            message: 'Validation failed',
+            data: null,
+            error: 'Video file is required'
+          };
+          return res.status(400).json({ 
+            success: false, 
+            message: 'Video file is required' 
+          });
+        }
       }
 
       if (!duration) {
@@ -860,14 +877,33 @@ module.exports = {
           error: null
         };
 
-        // 2. Create video
-        const video = await tx.video.create({
-          data: {
-            url: `/uploads/${req.file.filename}`,
-            duration: videoDuration,
-            moduleId: module.id,
-          },
-        });
+        // 2. Create video (file or YouTube)
+        let video;
+        if (videoType === 'youtube' && youtubeUrl) {
+          // Create YouTube video
+          video = await tx.video.create({
+            data: {
+              url: youtubeUrl,
+              duration: videoDuration,
+              moduleId: module.id,
+              title: youtubeTitle || 'YouTube Video',
+              thumbnail: youtubeThumbnail || null,
+              isYouTube: true,
+            },
+          });
+        } else if (req.file) {
+          // Create file video
+          video = await tx.video.create({
+            data: {
+              url: `/uploads/${req.file.filename}`,
+              duration: videoDuration,
+              moduleId: module.id,
+              isYouTube: false,
+            },
+          });
+        } else {
+          throw new Error('No video file or YouTube URL provided');
+        }
 
         // Update progress
         global.moduleCreationProgress[sessionId] = {
@@ -968,14 +1004,138 @@ module.exports = {
   updateModule: async (req, res) => {
     try {
       const { id } = req.params;
-      const { name } = req.body;
-      const module = await prisma.trainingModule.update({
-        where: { id: Number(id) },
-        data: { name },
+      
+      // Handle both FormData and JSON requests
+      const uploadedVideoFile = req.file; // From multer middleware
+      const { 
+        name, 
+        duration, 
+        mcqs,
+        youtubeUrl,
+        youtubeTitle,
+        youtubeThumbnail,
+        videoType,
+        removeVideo
+      } = req.body;
+
+      console.log('📤 updateModule called with:', {
+        id,
+        name,
+        videoType,
+        removeVideo,
+        youtubeUrl: youtubeUrl ? 'YouTube URL provided' : 'No YouTube URL',
+        uploadedVideoFile: uploadedVideoFile ? `File uploaded: ${uploadedVideoFile.filename}` : 'No file uploaded',
+        hasFormData: !!req.file,
+        bodyKeys: Object.keys(req.body),
+        bodyValues: req.body,
+        contentType: req.headers['content-type'],
+        fileField: req.file ? req.file.fieldname : 'No file field'
       });
-      res.json(module);
+
+      // Validate required fields
+      if (!name) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Module name is required' 
+        });
+      }
+
+      // Start transaction for updating module and videos
+      const result = await prisma.$transaction(async (tx) => {
+        console.log('🔄 Starting transaction for module update:', id);
+        
+        // Update module name
+        const updatedModule = await tx.trainingModule.update({
+          where: { id: Number(id) },
+          data: { name },
+        });
+        console.log('✅ Updated module name:', updatedModule.name);
+
+        // Handle video updates
+        // Always remove existing videos if we're updating video content
+        const shouldRemoveVideos = removeVideo || (videoType === 'youtube' && youtubeUrl) || uploadedVideoFile;
+        
+        if (shouldRemoveVideos) {
+          console.log('🗑️ Removing existing videos for module:', id);
+          await tx.video.deleteMany({
+            where: { moduleId: Number(id) }
+          });
+          console.log('✅ Removed existing videos for module:', id);
+        }
+        
+        // Add new video if provided
+        if (videoType === 'youtube' && youtubeUrl) {
+          console.log('📺 Adding YouTube video:', youtubeUrl);
+          const newVideo = await tx.video.create({
+            data: {
+              url: youtubeUrl,
+              title: youtubeTitle || 'YouTube Video',
+              thumbnail: youtubeThumbnail || '',
+              duration: Number(duration) || 0,
+              isYouTube: true,
+              moduleId: Number(id)
+            }
+          });
+          console.log('📺 Added YouTube video:', newVideo.id);
+        } else if (uploadedVideoFile) {
+          console.log('📁 Adding uploaded video file:', uploadedVideoFile.filename);
+          const newVideo = await tx.video.create({
+            data: {
+              url: `/uploads/${uploadedVideoFile.filename}`,
+              duration: Number(duration) || 0,
+              isYouTube: false,
+              moduleId: Number(id)
+            }
+          });
+          console.log('✅ Added file video:', newVideo.id);
+        }
+
+        // Handle MCQs if provided
+        if (mcqs && Array.isArray(mcqs)) {
+          // First, get existing MCQs to delete their answers
+          const existingMCQs = await tx.mCQ.findMany({
+            where: { moduleId: Number(id) },
+            select: { id: true }
+          });
+          
+          // Delete MCQAnswers first (foreign key constraint)
+          for (const mcq of existingMCQs) {
+            await tx.mCQAnswer.deleteMany({
+              where: { mcqId: mcq.id }
+            });
+          }
+          
+          // Then remove existing MCQs
+          await tx.mCQ.deleteMany({
+            where: { moduleId: Number(id) }
+          });
+
+          // Add new MCQs
+          for (const mcq of mcqs) {
+            await tx.mCQ.create({
+              data: {
+                question: mcq.question,
+                options: mcq.options,
+                answer: mcq.answer,
+                explanation: mcq.explanation || '',
+                moduleId: Number(id)
+              }
+            });
+          }
+          console.log('❓ Updated MCQs:', mcqs.length);
+        }
+
+        return updatedModule;
+      });
+
+      res.json({ success: true, module: result });
     } catch (err) {
-      res.status(500).json({ message: 'Server error' });
+      console.error('❌ updateModule error:', err);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Failed to update module',
+        error: err.message 
+      });
     }
   },
   deleteModule: async (req, res) => {
@@ -1053,10 +1213,8 @@ module.exports = {
   addVideo: async (req, res) => {
     try {
       const { id } = req.params; 
-      const { duration } = req.body;
-      if (!req.file) {
-        return res.status(400).json({ message: 'Video file is required' });
-      }
+      const { duration, youtubeUrl, youtubeTitle, youtubeThumbnail, videoType } = req.body;
+      
       
       if (!duration) {
         return res.status(400).json({ message: 'Video duration is required' });
@@ -1067,24 +1225,51 @@ module.exports = {
       if (isNaN(videoDuration) || !isFinite(videoDuration) || videoDuration <= 0) {
         return res.status(400).json({ message: 'Invalid video duration. Please provide a valid positive number.' });
       }
-      await prisma.video.deleteMany({ where: { moduleId: Number(id) } });
-      const video = await prisma.video.create({
-        data: {
-          url: `/uploads/${req.file.filename}`,
-          duration: videoDuration,
-          moduleId: Number(id),
-        },
-      });
-      res.status(201).json({ 
-        success: true, 
-        message: 'Video uploaded successfully',
-        video: video
-      });
+
+      // Check if it's a YouTube video or file upload
+      if (videoType === 'youtube' && youtubeUrl) {
+        // Handle YouTube video
+        await prisma.video.deleteMany({ where: { moduleId: Number(id) } });
+        const video = await prisma.video.create({
+          data: {
+            url: youtubeUrl,
+            duration: videoDuration,
+            moduleId: Number(id),
+            title: youtubeTitle || 'YouTube Video',
+            thumbnail: youtubeThumbnail || null,
+            isYouTube: true,
+          },
+        });
+        res.status(201).json({ 
+          success: true, 
+          message: 'YouTube video added successfully',
+          video: video
+        });
+      } else if (req.file) {
+        // Handle file upload
+        await prisma.video.deleteMany({ where: { moduleId: Number(id) } });
+        const video = await prisma.video.create({
+          data: {
+            url: `/uploads/${req.file.filename}`,
+            duration: videoDuration,
+            moduleId: Number(id),
+            isYouTube: false,
+          },
+        });
+        res.status(201).json({ 
+          success: true, 
+          message: 'Video uploaded successfully',
+          video: video
+        });
+      } else {
+        return res.status(400).json({ message: 'Video file or YouTube URL is required' });
+      }
     } catch (err) {
       res.status(500).json({ 
         success: false, 
         message: 'Failed to upload video', 
-        error: err.message 
+        error: err.message,
+        details: err.code || 'Unknown error'
       });
     }
   },
@@ -1370,6 +1555,9 @@ module.exports = {
               id: true,
               url: true,
               duration: true,
+              title: true,
+              thumbnail: true,
+              isYouTube: true,
             },
           },
           mcqs: {
@@ -1399,6 +1587,60 @@ module.exports = {
       });
       res.json(modules);
     } catch (err) {
+      res.status(500).json({ message: 'Server error' });
+    }
+  },
+  getModule: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const module = await prisma.trainingModule.findUnique({
+        where: { id: Number(id) },
+        include: {
+          company: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          videos: {
+            select: {
+              id: true,
+              url: true,
+              duration: true,
+              title: true,
+              thumbnail: true,
+              isYouTube: true,
+            },
+          },
+          mcqs: {
+            select: {
+              id: true,
+              question: true,
+              options: true,
+              answer: true,
+              explanation: true,
+            },
+          },
+          resources: {
+            select: {
+              id: true,
+              filename: true,
+              originalName: true,
+              type: true,
+              url: true,
+              filePath: true,
+            },
+          },
+        },
+      });
+      
+      if (!module) {
+        return res.status(404).json({ message: 'Module not found' });
+      }
+      
+      res.json(module);
+    } catch (err) {
+      console.error('Error fetching module:', err);
       res.status(500).json({ message: 'Server error' });
     }
   },
